@@ -8,14 +8,18 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
+    "audit": "^0.0.6",
     "body-parser": "^1.20.3",
     "cookie-parser": "^1.4.7",
     "core-js": "^3.8.3",
     "cors": "^2.8.5",
+    "csurf": "^1.11.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "firebase": "^11.1.0",
+    "fix": "^0.0.6",
     "vue": "^3.2.13",
-    "vue-router": "^4.0.3"
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
     "@babel/core": "^7.12.16",
