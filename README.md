@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # book-ecomm-site
 
 ## Project setup
@@ -25,4 +24,3 @@ npm run lint
 See [Configuration Reference](https://cli.vuejs.org/config/).
 =======
 # proiect-tic
->>>>>>> bf4aeb4e6ae155c067d9532221475e824ea05e9e
