@@ -1,4 +1,4 @@
-# book-ecomm-site
+# book-ecomm-site TIC Project
 
 ## Project setup
 ```
@@ -23,4 +23,4 @@ npm run lint
 ### Customize configuration
 See [Configuration Reference](https://cli.vuejs.org/config/).
 =======
-# proiect-tic
+
