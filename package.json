@@ -8,6 +8,7 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
+    "@faker-js/faker": "^9.4.0",
     "audit": "^0.0.6",
     "body-parser": "^1.20.3",
     "cookie-parser": "^1.4.7",
