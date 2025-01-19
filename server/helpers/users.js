@@ -6,6 +6,7 @@ const generateMockUser = () => {
   const lastName = faker.name.lastName();
 
   return {
+    userId: faker.datatype.uuid(),
     firstName: firstName,
     lastName: lastName,
     email: `${firstName}.${lastName}@example.com`.toLowerCase(),
