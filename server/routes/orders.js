@@ -8,5 +8,9 @@ router.get("/", orderController.getAllOrders);
 router.get("/:id", orderController.getOrderById);
 router.get("/status/:status", orderController.getOrdersByStatus);
 router.put("/:id", orderController.updateOrder);
+router.delete("/:id", orderController.deleteOrder);
+router.patch("/:id/status", orderController.updateOrderStatus);
 
+// Data Generation
+router.post("/generate", orderController.generateMockOrders);
 module.exports = router;
