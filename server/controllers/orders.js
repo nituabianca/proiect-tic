@@ -51,6 +51,48 @@ const orderController = {
       res.status(500).json({ error: error.message });
     }
   },
+
+  async updateOrder(req, res) {
+    try {
+      const orderId = req.params.id;
+      const updateData = req.body;
+      const orderRef = db.collection("orders").doc(orderId);
+
+      await orderRef.update({
+        ...updateData,
+        updatedAt: new Date(),
+      });
+
+      const updated = await orderRef.get();
+      res.json({
+        id: updated.id,
+        ...updated.data(),
+      });
+    } catch (error) {
+      console.error("Error updating order:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  async getOrdersByStatus(req, res) {
+    try {
+      const { status } = req.params;
+      const snapshot = await db
+        .collection("orders")
+        .where("orderStatus", "==", status)
+        .get();
+
+      const orders = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      res.json(orders);
+    } catch (error) {
+      console.error("Error getting orders by status:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
 };
 
 module.exports = orderController;
