@@ -16,7 +16,8 @@
     "csurf": "^1.11.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "firebase": "^11.1.0",
+    "firebase": "^11.2.0",
+    "firebase-admin": "^13.0.2",
     "fix": "^0.0.6",
     "vue": "^3.2.13",
     "vue-router": "^4.5.0"

@@ -1,9 +1,5 @@
-const { generateMockBook } = require("./books");
-const { generateMockOrder } = require("./orders");
-const { generateMockUser } = require("./users");
+const books = require("./books");
+const orders = require("./orders");
+const users = require("./users");
 
-module.exports = {
-  books: { generateMockBook },
-  orders: { generateMockOrder },
-  users: { generateMockUser },
-};
+module.exports = { books, orders, users };
