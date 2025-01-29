@@ -1,10 +1,7 @@
 const { faker } = require("@faker-js/faker");
 
 const generateMockOrder = (options = {}) => {
-  // Default number of products if not specified
   const numProducts = faker.number.int({ min: 1, max: 5 });
-
-  // Generate product items
   const items = Array.from({ length: numProducts }, () => ({
     bookId: options.books
       ? faker.helpers.arrayElement(options.books).id
@@ -12,8 +9,6 @@ const generateMockOrder = (options = {}) => {
     quantity: faker.number.int({ min: 1, max: 3 }),
     priceAtPurchase: parseFloat(faker.commerce.price({ min: 10, max: 100 })),
   }));
-
-  // Calculate total
   const totalAmount = items.reduce(
     (sum, item) => sum + item.priceAtPurchase * item.quantity,
     0
