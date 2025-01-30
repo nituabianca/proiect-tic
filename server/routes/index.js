@@ -6,9 +6,9 @@ const orderRoutes = require("./orders");
 const userRoutes = require("./users");
 const authRoutes = require("./auth");
 
+router.use("/auth", authRoutes);
 router.use("/books", bookRoutes);
 router.use("/orders", orderRoutes);
 router.use("/users", userRoutes);
-router.use("/auth", authRoutes);
 
 module.exports = router;

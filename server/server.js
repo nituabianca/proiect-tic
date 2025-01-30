@@ -3,14 +3,10 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const cookieParser = require("cookie-parser");
 const routes = require("./routes");
-const app = express();
 
-app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static("public"));
-app.use(cors());
 dotenv.config();
+
+const app = express();
 
 app.use(
   cors({
@@ -18,6 +14,10 @@ app.use(
     credentials: true,
   })
 );
+app.use(cookieParser());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static("public"));
 
 app.use("/api", routes);
 
