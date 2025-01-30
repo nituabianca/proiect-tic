@@ -9,18 +9,32 @@ const authMiddleware = async (req, res, next) => {
     }
 
     const token = authHeader.split("Bearer ")[1];
-    const decodedToken = await admin.auth().verifyIdToken(token);
 
-    req.user = {
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      role: decodedToken.role || "user",
-    };
+    try {
+      const userRecord = await admin.auth().getUser(token);
 
-    next();
+      req.user = {
+        uid: userRecord.uid,
+        email: userRecord.email,
+        role: "user",
+      };
+
+      next();
+    } catch (error) {
+      console.error("Token verification failed:", error);
+      return res.status(401).json({
+        error: "Invalid or expired token",
+        details:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
   } catch (error) {
-    console.error("Auth Error:", error);
-    res.status(401).json({ error: "Invalid or expired token" });
+    console.error("Auth middleware error:", error);
+    res.status(401).json({
+      error: "Authentication failed",
+      details:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 };
 

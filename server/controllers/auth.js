@@ -41,9 +41,11 @@ const authController = {
 
   async login(req, res) {
     try {
-      const { email, password } = req.body;
+      const { email } = req.body;
+      console.log("Login attempt for:", email);
 
       const userRecord = await admin.auth().getUserByEmail(email);
+      console.log("Found user:", userRecord.uid);
 
       if (!userRecord.emailVerified) {
         return res.status(403).json({
@@ -52,42 +54,50 @@ const authController = {
         });
       }
 
-      const additionalClaims = {
-        role: "user",
-      };
-
-      const customToken = await admin
-        .auth()
-        .createCustomToken(userRecord.uid, additionalClaims);
-
       const userDoc = await db.collection("users").doc(userRecord.uid).get();
       const userData = userDoc.data();
+      console.log("Got user data from Firestore");
 
       res.json({
-        token: customToken,
+        token: userRecord.uid, // Just use the UID as the token
         user: {
           id: userRecord.uid,
           email: userRecord.email,
-          displayName: userRecord.displayName,
-          emailVerified: userRecord.emailVerified,
           firstName: userData.firstName,
           lastName: userData.lastName,
+          emailVerified: userRecord.emailVerified,
         },
       });
+
+      console.log("Login successful");
     } catch (error) {
       console.error("Login error:", error);
-      res.status(401).json({ error: "Invalid credentials" });
+      res.status(401).json({
+        error: "Invalid credentials",
+        details:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
     }
   },
 
   async logout(req, res) {
     try {
       const userId = req.user.uid;
+
       await admin.auth().revokeRefreshTokens(userId);
-      res.json({ message: "Logged out successfully" });
+
+      await db.collection("users").doc(userId).update({
+        lastLogout: new Date(),
+        updatedAt: new Date(),
+      });
+
+      res.json({
+        message: "Logged out successfully",
+        timestamp: new Date(),
+      });
     } catch (error) {
-      console.error("Error logging out:", error);
-      res.status(500).json({ error: error.message });
+      console.error("Logout error:", error);
+      res.status(500).json({ error: "Failed to logout" });
     }
   },
 
