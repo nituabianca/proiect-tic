@@ -33,8 +33,10 @@
 </template>
 
 <script>
+/* eslint-disable */
 import { ref } from "vue";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 import axios from "axios";
 
 export default {
@@ -44,37 +46,36 @@ export default {
     const password = ref("");
     const errorMessage = ref("");
     const router = useRouter();
+    const store = useStore();
 
     const handleLogin = async () => {
       try {
-        console.log("Login payload:", {
+        const response = await axios.post(`/api/auth/login`, {
           email: email.value,
-          password: password.value,
+          password: password.value
         });
 
-        const response = await axios.post(
-          `/api/auth/login`,
-          {
-            email: email.value,
-            password: password.value,
-          },
-          { withCredentials: true }
-        );
+        // Store token
+        localStorage.setItem('token', response.data.token);
 
-        console.log("Login response:", response.data);
+        // Set axios default header
+        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
 
-        // Optional: Set token in headers for subsequent requests
-        axios.defaults.headers.common[
-          "Authorization"
-        ] = `Bearer ${response.data.token}`;
+        // Update store if using Vuex
+        store.commit('auth/SET_USER', response.data.user);
+        store.commit('auth/SET_TOKEN', response.data.token);
 
-        router.push("/dashboard");
+        // Navigate to dashboard
+        router.push('/dashboard');
       } catch (error) {
-        console.error(
-          "Full login error:",
-          error.response ? error.response.data : error
-        );
-        errorMessage.value = error.response?.data?.error || "Login failed";
+        if (error.response?.data?.needsVerification) {
+          router.push({
+            path: '/verify-email',
+            query: { email: email.value }
+          });
+        } else {
+          errorMessage.value = error.response?.data?.error || 'Login failed';
+        }
       }
     };
 

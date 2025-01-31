@@ -3,13 +3,23 @@
     <form @submit.prevent="handleRegister" class="auth-form">
       <h2>Register</h2>
       <div class="form-group">
-        <label for="username">Username</label>
+        <label for="firstName">First Name</label>
         <input
           type="text"
-          id="username"
-          v-model="username"
+          id="firstName"
+          v-model="firstName"
           required
-          placeholder="Choose a username"
+          placeholder="Enter your first name"
+        />
+      </div>
+      <div class="form-group">
+        <label for="lastName">Last Name</label>
+        <input
+          type="text"
+          id="lastName"
+          v-model="lastName"
+          required
+          placeholder="Enter your last name"
         />
       </div>
       <div class="form-group">
@@ -30,6 +40,7 @@
           v-model="password"
           required
           placeholder="Create a password"
+          minlength="6"
         />
       </div>
       <div class="form-group">
@@ -40,14 +51,20 @@
           v-model="confirmPassword"
           required
           placeholder="Confirm your password"
+          minlength="6"
         />
       </div>
-      <button type="submit" class="auth-button">Register</button>
+      <button type="submit" class="auth-button" :disabled="loading">
+        {{ loading ? "Registering..." : "Register" }}
+      </button>
       <p class="auth-link">
         Already have an account?
         <router-link to="/login">Login here</router-link>
       </p>
-      <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+      <div v-if="errorMessage" class="error-message">{{ errorMessage }}</div>
+      <div v-if="successMessage" class="success-message">
+        {{ successMessage }}
+      </div>
     </form>
   </div>
 </template>
@@ -55,49 +72,72 @@
 <script>
 import { ref } from "vue";
 import { useRouter } from "vue-router";
-import axios from "axios";
+import { useStore } from "vuex";
 
 export default {
   name: "RegisterPage",
   setup() {
-    const username = ref("");
+    const firstName = ref("");
+    const lastName = ref("");
     const email = ref("");
     const password = ref("");
     const confirmPassword = ref("");
     const errorMessage = ref("");
+    const successMessage = ref("");
+    const loading = ref(false);
     const router = useRouter();
+    const store = useStore();
 
-    const handleRegister = async () => {
+    const validateForm = () => {
       if (password.value !== confirmPassword.value) {
         errorMessage.value = "Passwords do not match";
-        return;
+        return false;
       }
+      if (password.value.length < 6) {
+        errorMessage.value = "Password must be at least 6 characters long";
+        return false;
+      }
+      return true;
+    };
+
+    const handleRegister = async () => {
+      if (!validateForm()) return;
+
+      loading.value = true;
+      errorMessage.value = "";
+      successMessage.value = "";
 
       try {
-        await axios.post(
-          `${process.env.VUE_APP_API_URL}/api/auth/register`,
-          {
-            username: username.value,
-            email: email.value,
-            password: password.value,
-          },
-          { withCredentials: true }
-        );
+        await store.dispatch("auth/register", {
+          firstName: firstName.value,
+          lastName: lastName.value,
+          email: email.value,
+          password: password.value,
+        });
 
-        router.push("/dashboard");
+        successMessage.value =
+          "Registration successful! Redirecting to login...";
+        setTimeout(() => {
+          router.push("/login");
+        }, 2000);
       } catch (error) {
         errorMessage.value =
-          error.response?.data?.message || "Registration failed";
+          error.response?.data?.error || "Registration failed";
         console.error("Registration error:", error);
+      } finally {
+        loading.value = false;
       }
     };
 
     return {
-      username,
+      firstName,
+      lastName,
       email,
       password,
       confirmPassword,
       errorMessage,
+      successMessage,
+      loading,
       handleRegister,
     };
   },
@@ -105,12 +145,12 @@ export default {
 </script>
 
 <style scoped>
-/* Use the same styles as LoginPage */
 .register-container {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  min-height: 100vh;
+  padding: 2rem;
   background-color: #f0f2f5;
 }
 
@@ -124,19 +164,28 @@ export default {
 }
 
 .form-group {
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .form-group label {
   display: block;
   margin-bottom: 0.5rem;
+  font-weight: 500;
 }
 
 .form-group input {
   width: 100%;
-  padding: 0.5rem;
+  padding: 0.75rem;
   border: 1px solid #ddd;
   border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.3s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #4caf50;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
 
 .auth-button {
@@ -147,21 +196,51 @@ export default {
   border: none;
   border-radius: 4px;
   cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
   transition: background-color 0.3s ease;
 }
 
-.auth-button:hover {
+.auth-button:hover:not(:disabled) {
   background-color: #45a049;
+}
+
+.auth-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
 
 .auth-link {
   text-align: center;
-  margin-top: 1rem;
+  margin-top: 1.5rem;
+  color: #666;
+}
+
+.auth-link a {
+  color: #4caf50;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.auth-link a:hover {
+  text-decoration: underline;
 }
 
 .error-message {
-  color: red;
+  color: #dc3545;
   text-align: center;
   margin-top: 1rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+  background-color: rgba(220, 53, 69, 0.1);
+}
+
+.success-message {
+  color: #28a745;
+  text-align: center;
+  margin-top: 1rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+  background-color: rgba(40, 167, 69, 0.1);
 }
 </style>
