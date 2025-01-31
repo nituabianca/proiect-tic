@@ -1,15 +1,16 @@
-const db = require("../firebase/firebase");
+const { db } = require("../firebase/firebase");
 const { generateMockOrder } = require("../helpers/orders");
 
 const orderController = {
   async createOrder(req, res) {
     try {
-      const orderData = req.body;
-      const docRef = await db.collection("orders").add({
-        ...orderData,
+      const orderData = {
+        ...req.body,
+        userId: req.user.uid, // Add user ID to the order
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      };
+      const docRef = await db.collection("orders").add(orderData);
       const newOrder = await docRef.get();
 
       res.status(201).json({
@@ -24,7 +25,11 @@ const orderController = {
 
   async getAllOrders(req, res) {
     try {
-      const snapshot = await db.collection("orders").get();
+      const snapshot = await db
+        .collection("orders")
+        .where("userId", "==", req.user.uid) // Filter by current user's ID
+        .get();
+
       const orders = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),

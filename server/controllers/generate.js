@@ -3,7 +3,7 @@ const Helpers = require("../helpers");
 const faker = require("@faker");
 const { fake } = require("faker");
 const admin = require("firebase-admin");
-const db = require("../firebase/firebase");
+const { db } = require("../firebase/firebase");
 
 const generateMockBooks = (req, res) => {
   let booksCount = req.body.books_count ? req.body.books_count : 50;

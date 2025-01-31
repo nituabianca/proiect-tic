@@ -1,4 +1,4 @@
-const db = require("../firebase/firebase");
+const { db } = require("../firebase/firebase");
 const { generateMockBook } = require("../helpers/books");
 
 const bookController = {
@@ -18,13 +18,36 @@ const bookController = {
     }
   },
 
+  // async getAllBooks(req, res) {
+  //   try {
+  //     const snapshot = await db.collection("books").get();
+  //     const books = snapshot.docs.map((doc) => ({
+  //       id: doc.id,
+  //       ...doc.data(),
+  //     }));
+  //     res.json(books);
+  //   } catch (error) {
+  //     res.status(500).json({ error: error.message });
+  //   }
+  // },
+
   async getAllBooks(req, res) {
     try {
-      const snapshot = await db.collection("books").get();
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 12;
+      const offset = (page - 1) * limit;
+
+      const snapshot = await db
+        .collection("books")
+        .limit(limit)
+        .offset(offset)
+        .get();
+
       const books = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
+
       res.json(books);
     } catch (error) {
       res.status(500).json({ error: error.message });

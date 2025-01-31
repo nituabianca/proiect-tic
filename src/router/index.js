@@ -1,34 +1,54 @@
+// src/router/index.js
 import { createRouter, createWebHistory } from "vue-router";
+import LoginPage from "@/views/LoginPage.vue";
+import RegisterPage from "@/views/RegisterPage.vue";
+import BooksPage from "@/views/BookPage.vue";
+import DashboardPage from "@/views/DashboardPage.vue";
+import axios from "axios";
+
+// Middleware for authentication check
+const requireAuth = async (to, from, next) => {
+  try {
+    await axios.get(`${process.env.VUE_APP_API_URL}/api/auth/profile`, {
+      withCredentials: true,
+    });
+    next(); // User is authenticated
+  } catch (error) {
+    // Redirect to login if not authenticated
+    next("/login");
+  }
+};
 
 const routes = [
   {
+    path: "/books",
+    name: "Books",
+    component: BooksPage,
+  },
+  {
+    path: "/login",
+    name: "Login",
+    component: LoginPage,
+  },
+  {
+    path: "/register",
+    name: "Register",
+    component: RegisterPage,
+  },
+  {
+    path: "/dashboard",
+    name: "Dashboard",
+    component: DashboardPage,
+    beforeEnter: requireAuth,
+  },
+  {
     path: "/",
-    name: "home",
-    component: () => import("../views/HomeView.vue"),
-  },
-  {
-    path: "/about",
-    name: "about",
-    // route level code-splitting
-    // this generates a separate chunk (about.[hash].js) for this route
-    // which is lazy-loaded when the route is visited.
-    component: () =>
-      import(/* webpackChunkName: "about" */ "../views/AboutView.vue"),
-  },
-  {
-    path: "/sign-in",
-    name: "sign-in",
-    component: () => import("../views/SignInView.vue"),
-  },
-  {
-    path: "/sign-up",
-    name: "sign-up",
-    component: () => import("../views/SignUpView.vue"),
+    redirect: "/dashboard",
   },
 ];
 
 const router = createRouter({
-  history: createWebHistory(/*process.env.BASE_URL*/),
+  history: createWebHistory(),
   routes,
 });
 

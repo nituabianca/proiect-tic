@@ -5,10 +5,12 @@
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "start": "npm run serve"
   },
   "dependencies": {
+    "@heroicons/vue": "^2.2.0",
     "audit": "^0.0.6",
+    "axios": "^1.7.9",
     "body-parser": "^1.20.3",
     "cookie-parser": "^1.4.7",
     "core-js": "^3.8.3",
@@ -19,8 +21,10 @@
     "firebase": "^11.2.0",
     "firebase-admin": "^13.0.2",
     "fix": "^0.0.6",
+    "lucide-react": "^0.474.0",
     "vue": "^3.2.13",
-    "vue-router": "^4.5.0"
+    "vue-router": "^4.5.0",
+    "vuex": "^4.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.12.16",
