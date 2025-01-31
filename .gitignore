@@ -3,10 +3,12 @@ node_modules
 /dist
 /server/firebase/serviceAccountKey.json
 /server/firebase/firebase.data.js
+/src/firebase.js
 
 # local env files
 .env.local
 .env.*.local
+.env
 
 # Log files
 npm-debug.log*
