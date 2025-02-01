@@ -33,7 +33,6 @@
 </template>
 
 <script>
-/* eslint-disable */
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -52,29 +51,26 @@ export default {
       try {
         const response = await axios.post(`/api/auth/login`, {
           email: email.value,
-          password: password.value
+          password: password.value,
         });
 
-        // Store token
-        localStorage.setItem('token', response.data.token);
+        localStorage.setItem("token", response.data.token);
+        axios.defaults.headers.common[
+          "Authorization"
+        ] = `Bearer ${response.data.token}`;
 
-        // Set axios default header
-        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+        store.commit("auth/SET_USER", response.data.user);
+        store.commit("auth/SET_TOKEN", response.data.token);
 
-        // Update store if using Vuex
-        store.commit('auth/SET_USER', response.data.user);
-        store.commit('auth/SET_TOKEN', response.data.token);
-
-        // Navigate to dashboard
-        router.push('/dashboard');
+        router.push("/dashboard");
       } catch (error) {
         if (error.response?.data?.needsVerification) {
           router.push({
-            path: '/verify-email',
-            query: { email: email.value }
+            path: "/verify-email",
+            query: { email: email.value },
           });
         } else {
-          errorMessage.value = error.response?.data?.error || 'Login failed';
+          errorMessage.value = error.response?.data?.error || "Login failed";
         }
       }
     };

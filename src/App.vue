@@ -15,6 +15,7 @@
     >
       <router-view></router-view>
     </main>
+    <ToastNotification />
   </div>
 </template>
 
@@ -22,10 +23,12 @@
 import { ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import SidebarMenu from "@/components/SidebarMenu.vue";
+import ToastNotification from "@/components/ToastNotification.vue";
 
 export default {
   name: "App",
   components: {
+    ToastNotification,
     SidebarMenu,
   },
   setup() {
@@ -56,15 +59,14 @@ export default {
 .app-container {
   display: flex;
   min-height: 100vh;
+  background-color: #f4f6f9;
 }
 
 .main-content {
   flex: 1;
+  margin-left: 240px;
   transition: margin-left 0.3s ease;
-}
-
-.main-content.sidebar-expanded {
-  margin-left: 250px;
+  padding: 2rem;
 }
 
 .main-content.sidebar-collapsed {
@@ -73,37 +75,22 @@ export default {
 
 .main-content.no-sidebar {
   margin-left: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
 }
-/* Global styles */
+
 body {
   margin: 0;
   font-family: Arial, sans-serif;
   line-height: 1.6;
-  background-color: #f4f6f9;
 }
 
 * {
   box-sizing: border-box;
 }
 
-#app {
-  min-height: 100vh;
-}
-/*
-.main-content {
-  margin-left: 250px;
-  width: calc(100% - 250px);
-  min-height: 100vh;
-  transition: all 0.3s ease;
-}
-
-.main-content.full-width {
-  margin-left: 0;
-  width: 100%;
-}
-*/
-
-/* Reset link styles */
 a {
   text-decoration: none;
   color: #3498db;
@@ -113,31 +100,6 @@ a:hover {
   color: #2980b9;
 }
 
-#app {
-  display: flex;
-}
-
-.main-content {
-  flex: 1;
-  margin-left: 250px;
-  transition: margin-left 0.3s ease;
-}
-
-.with-sidebar .main-content {
-  margin-left: 250px;
-}
-
-.sidebar-collapsed .main-content {
-  margin-left: 80px;
-}
-
-@media (max-width: 768px) {
-  .main-content {
-    margin-left: 0;
-  }
-}
-
-/* Utility classes */
 .text-center {
   text-align: center;
 }
@@ -145,5 +107,12 @@ a:hover {
 .error-message {
   color: #e74c3c;
   margin: 1rem 0;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+    padding: 1rem;
+  }
 }
 </style>

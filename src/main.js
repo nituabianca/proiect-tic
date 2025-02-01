@@ -3,15 +3,22 @@ import App from "./App.vue";
 import router from "./router";
 import axios from "axios";
 import store from "@/store";
+import { library } from "@fortawesome/fontawesome-svg-core";
+import {
+  faPlus,
+  faEye,
+  faPen,
+  faTrash,
+  faX,
+} from "@fortawesome/free-solid-svg-icons";
 
-// Log the API URL
+library.add(faPlus, faEye, faPen, faTrash, faX);
+
 console.log("API URL:", process.env.VUE_APP_API_URL);
 
-// Configure axios defaults
 axios.defaults.baseURL = process.env.VUE_APP_API_URL || "http://localhost:3000";
 axios.defaults.withCredentials = true;
 
-// Create the Vue app
 const app = createApp(App);
 
 app.use(router);
@@ -25,7 +32,6 @@ axios.interceptors.request.use((config) => {
   return config;
 });
 
-// Mount the app
 app.mount("#app");
 
 console.log("API URL:", process.env.VUE_APP_API_URL);
