@@ -7,6 +7,34 @@
       </button>
     </div>
 
+    <div class="search-filters">
+      <input type="text" v-model="searchParams.title" placeholder="Title" />
+      <input type="text" v-model="searchParams.author" placeholder="Author" />
+
+      <select v-model="searchParams.genre">
+        <option value="">All Genres</option>
+        <option value="Fiction">Fiction</option>
+        <option value="Non-Fiction">Non-Fiction</option>
+        <option value="Science Fiction">Science Fiction</option>
+        <option value="Mystery">Mystery</option>
+        <option value="Romance">Romance</option>
+      </select>
+
+      <input
+        type="number"
+        v-model="searchParams.minPrice"
+        placeholder="Min Price"
+      />
+      <input
+        type="number"
+        v-model="searchParams.maxPrice"
+        placeholder="Max Price"
+      />
+
+      <button @click="searchBooks">Search</button>
+      <button @click="resetFilters">Reset</button>
+    </div>
+
     <div class="table-container">
       <table v-if="books.length">
         <thead>
@@ -90,7 +118,15 @@ export default {
     const page = ref(1);
     const loading = ref(false);
     const hasMore = ref(true);
-    const itemsPerPage = 10;
+    const itemsPerPage = 20;
+
+    const searchParams = ref({
+      title: "",
+      author: "",
+      genre: "",
+      minPrice: "",
+      maxPrice: "",
+    });
 
     const fetchBooks = async () => {
       if (loading.value || !hasMore.value) return;
@@ -110,6 +146,47 @@ export default {
       } finally {
         loading.value = false;
       }
+    };
+
+    /**
+     *
+     * Search function still under construction, routes not correctly called
+     */
+
+    const searchBooks = async () => {
+      try {
+        const params = new URLSearchParams();
+
+        if (searchParams.value.title)
+          params.append("title", searchParams.value.title);
+        if (searchParams.value.author)
+          params.append("author", searchParams.value.author);
+        if (searchParams.value.genre)
+          params.append("genre", searchParams.value.genre);
+        if (searchParams.value.minPrice)
+          params.append("minPrice", searchParams.value.minPrice);
+        if (searchParams.value.maxPrice)
+          params.append("maxPrice", searchParams.value.maxPrice);
+
+        // Send GET request with query params
+        const response = await axios.get(`/books/search?${params.toString()}`);
+
+        // Update the books array with the new search results
+        books.value = response.data;
+      } catch (error) {
+        console.error("Error searching books:", error);
+      }
+    };
+
+    const resetFilters = async () => {
+      searchParams.value = {
+        title: "",
+        author: "",
+        genre: "",
+        minPrice: "",
+        maxPrice: "",
+      };
+      await fetchBooks(); // Fetch all books again without filters
     };
 
     const handleScroll = () => {
@@ -209,6 +286,9 @@ export default {
       deleteBook,
       saveBook,
       getStockClass,
+      searchParams,
+      searchBooks,
+      resetFilters,
     };
   },
 };
@@ -236,6 +316,30 @@ export default {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.search-filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.search-filters input,
+.search-filters select {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+button {
+  padding: 8px 12px;
+  cursor: pointer;
+  border: none;
+  border-radius: 5px;
+}
+
+button:hover {
+  opacity: 0.8;
 }
 
 .table-container {
