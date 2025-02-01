@@ -17,5 +17,5 @@ router.delete("/:id", authMiddleware, orderController.deleteOrder);
 router.patch("/:id/status", authMiddleware, orderController.updateOrderStatus);
 
 // Data Generation
-router.post("/generate", authMiddleware, orderController.generateMockOrders);
+router.post("/generate", orderController.generateMockOrders);
 module.exports = router;
