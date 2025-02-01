@@ -150,8 +150,7 @@ export default {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  padding: 2rem;
-  background-color: #f0f2f5;
+  padding: 1rem;
 }
 
 .auth-form {
