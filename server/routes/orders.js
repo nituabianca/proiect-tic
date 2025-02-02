@@ -1,21 +1,23 @@
 const express = require("express");
 const router = express.Router();
 const orderController = require("../controllers/orders");
-const { authMiddleware } = require("../middlewares/auth");
-
-// CRUD Operations
-router.post("/", authMiddleware, orderController.createOrder);
-router.get("/", authMiddleware, orderController.getAllOrders);
-router.get("/:id", authMiddleware, orderController.getOrderById);
-router.get(
-  "/status/:status",
+const {
   authMiddleware,
-  orderController.getOrdersByStatus
-);
-router.put("/:id", authMiddleware, orderController.updateOrder);
-router.delete("/:id", authMiddleware, orderController.deleteOrder);
-router.patch("/:id/status", authMiddleware, orderController.updateOrderStatus);
+  userMiddleware,
+  adminMiddleware,
+} = require("../middlewares/auth");
 
-// Data Generation
+// User routes
+router.use(authMiddleware, userMiddleware);
+router.post("/", orderController.createOrder);
+router.get("/my", orderController.getMyOrders); // New endpoint needed
+
+// Admin routes
+router.use(adminMiddleware);
+router.get("/", orderController.getAllOrders);
+router.get("/:id", orderController.getOrderById);
+router.put("/:id", orderController.updateOrder);
+router.delete("/:id", orderController.deleteOrder);
+router.patch("/:id/status", orderController.updateOrderStatus);
 router.post("/generate", orderController.generateMockOrders);
 module.exports = router;

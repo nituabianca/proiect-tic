@@ -6,7 +6,7 @@ const orderController = {
     try {
       const orderData = {
         ...req.body,
-        userId: req.user.uid, // Add user ID to the order
+        userId: req.user.uid,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -23,11 +23,26 @@ const orderController = {
     }
   },
 
+  // Modified for admin access to all orders
   async getAllOrders(req, res) {
+    try {
+      const snapshot = await db.collection("orders").get();
+      const orders = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      res.json(orders);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  // New method for users to get their orders
+  async getMyOrders(req, res) {
     try {
       const snapshot = await db
         .collection("orders")
-        .where("userId", "==", req.user.uid) // Filter by current user's ID
+        .where("userId", "==", req.user.uid)
         .get();
 
       const orders = snapshot.docs.map((doc) => ({
@@ -48,15 +63,23 @@ const orderController = {
         return res.status(404).json({ message: "Order not found" });
       }
 
+      const order = doc.data();
+
+      // Check if user has access to this order
+      if (req.user.role !== "admin" && order.userId !== req.user.uid) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
       res.json({
         id: doc.id,
-        ...doc.data(),
+        ...order,
       });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   },
 
+  // Admin-only methods remain unchanged
   async updateOrder(req, res) {
     try {
       const orderId = req.params.id;
@@ -124,6 +147,31 @@ const orderController = {
     }
   },
 
+  async getOrdersByStatus(req, res) {
+    try {
+      let query = db
+        .collection("orders")
+        .where("orderStatus", "==", req.params.status);
+
+      // If not admin, only show user's orders
+      if (req.user.role !== "admin") {
+        query = query.where("userId", "==", req.user.uid);
+      }
+
+      const snapshot = await query.get();
+      const orders = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      res.json(orders);
+    } catch (error) {
+      console.error("Error getting orders by status:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  // Admin-only method
   async generateMockOrders(req, res) {
     try {
       const ordersCount = req.body.orders_count || 50;
@@ -152,26 +200,6 @@ const orderController = {
       return res.status(500).json({
         error: error.message || "Failed to generate orders",
       });
-    }
-  },
-
-  async getOrdersByStatus(req, res) {
-    try {
-      const { status } = req.params;
-      const snapshot = await db
-        .collection("orders")
-        .where("orderStatus", "==", status)
-        .get();
-
-      const orders = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
-      res.json(orders);
-    } catch (error) {
-      console.error("Error getting orders by status:", error);
-      res.status(500).json({ error: error.message });
     }
   },
 };

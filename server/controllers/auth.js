@@ -9,10 +9,22 @@ const authController = {
         email,
         password,
         displayName: `${firstName} ${lastName}`,
-        emailVerified: false,
+        emailVerified: false, // Explicitly set to false
       });
 
-      const link = await admin.auth().generateEmailVerificationLink(email);
+      // Set custom claim to mark as unverified
+      await admin
+        .auth()
+        .setCustomUserClaims(userRecord.uid, { emailVerified: false });
+
+      const actionCodeSettings = {
+        url: process.env.FRONTEND_URL || "http://localhost:3002",
+        handleCodeInApp: true,
+      };
+
+      const link = await admin
+        .auth()
+        .generateEmailVerificationLink(email, actionCodeSettings);
 
       await db.collection("users").doc(userRecord.uid).set({
         email,
@@ -31,6 +43,7 @@ const authController = {
           id: userRecord.uid,
           email: userRecord.email,
           displayName: userRecord.displayName,
+          emailVerified: false,
         },
       });
     } catch (error) {
