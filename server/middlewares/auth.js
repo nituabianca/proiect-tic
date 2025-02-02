@@ -10,8 +10,13 @@ const authMiddleware = async (req, res, next) => {
     const token = authHeader.split("Bearer ")[1];
     const userRecord = await admin.auth().getUser(token);
 
-    // Fetch user data including role from Firestore
+    // Fetch user data from Firestore
     const userDoc = await db.collection("users").doc(userRecord.uid).get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "User not found in database" });
+    }
+
     const userData = userDoc.data();
 
     req.user = {
@@ -19,6 +24,8 @@ const authMiddleware = async (req, res, next) => {
       email: userRecord.email,
       role: userData.role || "user",
       emailVerified: userRecord.emailVerified,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
     };
 
     next();
@@ -32,8 +39,8 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-const roleMiddleware = (allowedRoles) => (req, res, next) => {
-  if (!req.user || !allowedRoles.includes(req.user.role)) {
+const checkRole = (roles) => (req, res, next) => {
+  if (!req.user || !roles.includes(req.user.role)) {
     return res.status(403).json({ error: "Insufficient permissions" });
   }
   next();
@@ -41,6 +48,6 @@ const roleMiddleware = (allowedRoles) => (req, res, next) => {
 
 module.exports = {
   authMiddleware,
-  adminMiddleware: roleMiddleware(["admin"]),
-  userMiddleware: roleMiddleware(["user", "admin"]),
+  adminMiddleware: [authMiddleware, checkRole(["admin"])],
+  userMiddleware: [authMiddleware, checkRole(["user", "admin"])],
 };

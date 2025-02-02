@@ -11,7 +11,7 @@
 
     <nav class="nav-menu">
       <router-link
-        v-for="item in filteredMenuItems"
+        v-for="item in menuItems"
         :key="item.path"
         :to="item.path"
         class="nav-item"
@@ -34,21 +34,22 @@
 </template>
 
 <script>
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library } from "@fortawesome/fontawesome-svg-core";
 import {
   faUser,
   faHome,
   faBook,
   faShoppingCart,
-  faCog,
+  faEdit,
   faChevronLeft,
   faChevronRight,
   faSignOutAlt,
+  faClipboardList,
 } from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import axios from "axios";
 
 library.add(
@@ -56,10 +57,11 @@ library.add(
   faBook,
   faShoppingCart,
   faUser,
-  faCog,
+  faEdit,
   faChevronLeft,
   faChevronRight,
-  faSignOutAlt
+  faSignOutAlt,
+  faClipboardList
 );
 
 export default {
@@ -74,16 +76,21 @@ export default {
     },
   },
   emits: ["toggle"],
+
   setup(props, { emit }) {
+    /*eslint-disable*/
+    const store = useStore();
     const route = useRoute();
     const router = useRouter();
-    const store = useStore();
+    const userRole = ref(null);
+
     const currentRoute = computed(() => route.path);
-    const isAdmin = computed(() => store.state.auth.user?.role === "admin");
 
     const adminMenuItems = [
       { name: "Dashboard", path: "/dashboard", icon: "home" },
       { name: "Books", path: "/books", icon: "book" },
+      { name: "Manage Books", path: "/books/manage", icon: "edit" },
+      { name: "Manage Orders", path: "/orders/manage", icon: "clipboard-list" },
       { name: "Cart", path: "/cart", icon: "shopping-cart" },
       { name: "Profile", path: "/profile", icon: "user" },
     ];
@@ -94,8 +101,19 @@ export default {
       { name: "Profile", path: "/profile", icon: "user" },
     ];
 
-    const filteredMenuItems = computed(() =>
-      isAdmin.value ? adminMenuItems : userMenuItems
+    const fetchUserRole = async () => {
+      try {
+        const response = await axios.get("/api/auth/profile");
+        userRole.value = response.data.role;
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+      }
+    };
+
+    onMounted(fetchUserRole);
+
+    const menuItems = computed(() =>
+      userRole.value === "admin" ? adminMenuItems : userMenuItems
     );
 
     const handleLogout = async () => {
@@ -113,7 +131,7 @@ export default {
     };
 
     return {
-      filteredMenuItems,
+      menuItems,
       currentRoute,
       toggleSidebar,
       handleLogout,
@@ -181,6 +199,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  height: calc(100vh - 100px);
 }
 
 .nav-item {
@@ -243,5 +262,9 @@ export default {
   background-color: rgba(255, 105, 97, 0.2);
   color: rgb(255, 105, 97);
   transform: translateX(5px);
+}
+
+.logout-btn:hover .nav-icon {
+  color: rgb(255, 105, 97);
 }
 </style>

@@ -432,4 +432,8 @@ th {
   justify-content: center;
   gap: 1rem;
 }
+.delete-btn {
+  background: #e74c3c;
+  color: white;
+}
 </style>

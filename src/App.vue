@@ -59,7 +59,7 @@ export default {
 .app-container {
   display: flex;
   min-height: 100vh;
-  background-color: #f4f6f9;
+  background-color: #dbe9f4;
 }
 
 .main-content {

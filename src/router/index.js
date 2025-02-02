@@ -9,6 +9,7 @@ import axios from "axios";
 import ProfilePage from "@/views/ProfilePage.vue";
 import CartPage from "@/views/CartPage.vue";
 import OrderDetailsPage from "@/views/OrderDetailsPage.vue";
+import ManageOrdersPage from "@/views/ManageOrdersPage.vue";
 
 const requireAuth = async (to, from, next) => {
   try {
@@ -99,6 +100,12 @@ const routes = [
     name: "OrderDetails",
     component: OrderDetailsPage,
     beforeEnter: requireAuth,
+  },
+  {
+    path: "/orders/manage",
+    name: "ManageOrders",
+    component: ManageOrdersPage,
+    beforeEnter: requireAdmin,
   },
   {
     path: "/",

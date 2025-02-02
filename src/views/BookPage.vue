@@ -3,7 +3,12 @@
     <div class="books-grid" ref="booksContainer">
       <div v-for="book in books" :key="book.id" class="book-card">
         <div class="book-cover-container">
-          <img :alt="book.title" class="book-cover" />
+          <img
+            :src="`https://picsum.photos/seed/${book.id}/300/400`"
+            :alt="book.title"
+            class="book-cover"
+            @error="handleImageError"
+          />
         </div>
         <div class="book-details">
           <h3 class="book-title">{{ book.title }}</h3>
@@ -25,7 +30,6 @@
       No books found
     </div>
 
-    <!-- Cart Preview -->
     <div class="cart-preview" v-if="cartItemCount > 0">
       <div class="cart-count">{{ cartItemCount }} items</div>
       <div class="cart-total">${{ cartTotal.toFixed(2) }}</div>
@@ -80,6 +84,10 @@ export default {
       }
     };
 
+    const handleImageError = (event) => {
+      event.target.src = "https://picsum.photos/300/400";
+    };
+
     const addToCart = (book) => {
       store.dispatch("cart/addToCart", book);
     };
@@ -98,6 +106,7 @@ export default {
       loading,
       hasMore,
       booksContainer,
+      handleImageError,
       addToCart,
       cartItemCount,
       cartTotal,

@@ -309,10 +309,10 @@ export default {
 
 .save-btn,
 .cancel-btn {
-  padding: 0.5rem 1.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-weight: 500;
 }
 
 .save-btn {
@@ -322,8 +322,7 @@ export default {
 }
 
 .cancel-btn {
-  background: #f5f5f5;
-  border: 1px solid #ddd;
-  color: #666;
+  background: #95a5a6;
+  color: white;
 }
 </style>
