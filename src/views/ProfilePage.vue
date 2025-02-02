@@ -3,8 +3,12 @@
     <div class="profile-header">
       <h1>Profile Settings</h1>
       <div class="user-info-summary">
-        <font-awesome-icon icon="user" class="user-icon" />
-        <span>{{ user?.email }}</span>
+        <div
+          class="email-verify-status"
+          :class="{ verified: user?.emailVerified }"
+        >
+          {{ user?.emailVerified ? "Email Verified" : "Email Not Verified" }}
+        </div>
       </div>
     </div>
 
@@ -23,19 +27,10 @@
 
           <div class="form-group">
             <label>Email</label>
-            <input type="email" v-model="formData.email" required />
+            <input type="email" v-model="formData.email" required disabled />
           </div>
 
-          <div class="form-group">
-            <label>Preferred Language</label>
-            <select v-model="formData.preferences.language">
-              <option value="EN">English</option>
-              <option value="RO">Romanian</option>
-              <option value="FR">French</option>
-            </select>
-          </div>
-
-          <div class="form-group">
+          <div class="form-group full-width">
             <label>Address</label>
             <div class="address-fields">
               <input
@@ -62,13 +57,21 @@
                 type="text"
                 v-model="formData.address.country"
                 placeholder="Country"
-                class="full-width"
               />
             </div>
           </div>
 
           <div class="form-group">
-            <label>Notification Preferences</label>
+            <label>Language</label>
+            <select v-model="formData.preferences.language">
+              <option value="EN">English</option>
+              <option value="RO">Romanian</option>
+              <option value="FR">French</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Preferences</label>
             <div class="checkbox-group">
               <label>
                 <input
@@ -89,27 +92,47 @@
         </div>
 
         <div class="form-actions">
+          <button
+            v-if="!user?.emailVerified"
+            type="button"
+            class="verify-btn"
+            @click="resendVerification"
+          >
+            Resend Verification Email
+          </button>
           <button type="submit" class="save-btn" :disabled="loading">
             {{ loading ? "Saving..." : "Save Changes" }}
           </button>
         </div>
       </form>
 
-      <div class="recent-orders">
-        <h2>Recent Orders</h2>
-        <div v-if="orders.length" class="orders-list">
-          <div v-for="order in orders" :key="order.id" class="order-item">
-            <div class="order-header">
-              <span class="order-id">Order #{{ order.id }}</span>
-              <span class="order-date">{{ formatDate(order.createdAt) }}</span>
+      <div class="side-panel">
+        <div class="recent-orders">
+          <h2>Recent Orders</h2>
+          <div v-if="orders.length" class="orders-list">
+            <div v-for="order in orders" :key="order.id" class="order-item">
+              <div class="order-header">
+                <span class="order-id">Order #{{ order.id }}</span>
+                <span class="order-date">{{
+                  formatDate(order.createdAt)
+                }}</span>
+              </div>
+              <div class="order-status" :class="order.orderStatus">
+                {{ order.orderStatus }}
+              </div>
+              <div class="order-info">
+                <div class="order-items-count">
+                  {{ order.items.length }} items
+                </div>
+                <div class="order-total">${{ order.total.toFixed(2) }}</div>
+              </div>
+              <router-link :to="'/orders/' + order.id" class="view-order-btn">
+                View Details
+              </router-link>
             </div>
-            <div class="order-status" :class="order.status">
-              {{ order.status }}
-            </div>
-            <div class="order-total">${{ order.totalAmount.toFixed(2) }}</div>
           </div>
+          <div v-else class="no-orders">No orders yet</div>
         </div>
-        <div v-else class="no-orders">No orders yet</div>
       </div>
     </div>
   </div>
@@ -120,12 +143,11 @@ import { ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useToast } from "@/composables/useToast";
 import axios from "axios";
-import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
 export default {
   name: "ProfilePage",
-  components: { FontAwesomeIcon },
   setup() {
+    /*eslint-disable*/
     const store = useStore();
     const { showToast } = useToast();
     const loading = ref(false);
@@ -178,7 +200,7 @@ export default {
 
     const fetchOrders = async () => {
       try {
-        const response = await axios.get(`/api/users/${user.value.id}/orders`);
+        const response = await axios.get("/api/orders/my");
         orders.value = response.data;
       } catch (error) {
         showToast("Error fetching orders", "error");
@@ -189,11 +211,21 @@ export default {
       loading.value = true;
       try {
         await axios.put(`/api/users/${user.value.id}`, formData.value);
+        await fetchProfile(); // Refresh profile data
         showToast("Profile updated successfully", "success");
       } catch (error) {
         showToast("Error updating profile", "error");
       } finally {
         loading.value = false;
+      }
+    };
+
+    const resendVerification = async () => {
+      try {
+        await axios.post("/api/auth/verify/resend");
+        showToast("Verification email sent", "success");
+      } catch (error) {
+        showToast("Error sending verification email", "error");
       }
     };
 
@@ -210,9 +242,9 @@ export default {
       user,
       formData,
       orders,
-      store,
       loading,
       updateProfile,
+      resendVerification,
       formatDate,
     };
   },
@@ -235,16 +267,21 @@ export default {
   border-bottom: 2px solid #e0e4e8;
 }
 
-.user-info-summary {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: #666;
+.email-verify-status {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
-.user-icon {
-  font-size: 1.5rem;
-  color: #3498db;
+.email-verify-status.verified {
+  background: #d1e7dd;
+  color: #0f5132;
+}
+
+.email-verify-status:not(.verified) {
+  background: #fff3cd;
+  color: #856404;
 }
 
 .profile-content {
@@ -253,36 +290,38 @@ export default {
   gap: 2rem;
 }
 
-.profile-form {
-  background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 1.5rem;
+}
+
+.full-width {
+  grid-column: 1 / -1;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
 }
 
 .form-group label {
-  margin-bottom: 0.5rem;
   font-weight: 500;
-  color: #444;
+  color: #2c3e50;
 }
 
 .form-group input,
 .form-group select {
   padding: 0.75rem;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 1rem;
+}
+
+.form-group input:disabled {
+  background: #f8f9fa;
+  cursor: not-allowed;
 }
 
 .address-fields {
@@ -291,85 +330,80 @@ export default {
   gap: 1rem;
 }
 
-.address-fields .full-width {
-  grid-column: 1 / -1;
-}
-
 .checkbox-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-}
-
-.checkbox-group label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .form-actions {
   margin-top: 2rem;
-  padding-top: 1rem;
+  padding-top: 1.5rem;
   border-top: 1px solid #eee;
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.save-btn,
+.verify-btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
 .save-btn {
-  background: #4caf50;
+  background: #3498db;
   color: white;
-  padding: 0.75rem 2rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
 }
 
-.save-btn:disabled {
-  background: #ccc;
-  cursor: not-allowed;
+.verify-btn {
+  background: #f1c40f;
+  color: #34495e;
 }
 
-/* Rest of the previous styles remain the same */
+.save-btn:hover {
+  background: #2980b9;
+}
+.verify-btn:hover {
+  background: #f39c12;
+}
+
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
 .recent-orders {
   background: white;
-  padding: 1.5rem;
   border-radius: 8px;
+  padding: 1.5rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.recent-orders h2 {
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid #e0e4e8;
 }
 
 .order-item {
   padding: 1rem;
   border: 1px solid #eee;
-  border-radius: 4px;
+  border-radius: 6px;
   margin-bottom: 1rem;
 }
 
 .order-header {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 0.5rem;
-}
-
-.order-id {
-  font-weight: 500;
-  color: #3498db;
-}
-
-.order-date {
-  color: #666;
+  margin-bottom: 0.75rem;
 }
 
 .order-status {
   display: inline-block;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  padding: 0.25rem 0.75rem;
+  border-radius: 15px;
   font-size: 0.875rem;
-  font-weight: 500;
+  margin-bottom: 0.75rem;
 }
 
 .order-status.pending {
@@ -393,9 +427,39 @@ export default {
   color: #721c24;
 }
 
-.no-orders {
-  text-align: center;
+.order-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
   color: #666;
-  padding: 2rem;
+}
+
+.view-order-btn {
+  display: block;
+  text-align: center;
+  padding: 0.5rem;
+  background: #f8f9fa;
+  color: #2c3e50;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.view-order-btn:hover {
+  background: #e9ecef;
+}
+
+@media (max-width: 768px) {
+  .profile-content {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .address-fields {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
