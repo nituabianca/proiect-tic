@@ -6,6 +6,7 @@ import BooksPage from "@/views/BookPage.vue";
 import DashboardPage from "@/views/DashboardPage.vue";
 import ManageBooksPage from "@/views/ManageBooksPage.vue";
 import axios from "axios";
+import ProfilePage from "@/views/ProfilePage.vue";
 
 const requireAuth = async (to, from, next) => {
   try {
@@ -60,6 +61,12 @@ const routes = [
     path: "/books/manage",
     name: "ManageBooks",
     component: ManageBooksPage,
+    beforeEnter: requireAuth,
+  },
+  {
+    path: "/profile",
+    name: "Profile",
+    component: ProfilePage,
     beforeEnter: requireAuth,
   },
   {

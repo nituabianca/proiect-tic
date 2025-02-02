@@ -31,10 +31,10 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { library } from "@fortawesome/fontawesome-svg-core";
 import {
+  faUser,
   faHome,
   faBook,
   faShoppingCart,
-  faUser,
   faCog,
   faChevronLeft,
   faChevronRight,

@@ -7,32 +7,14 @@
       </button>
     </div>
 
-    <div class="search-filters">
-      <input type="text" v-model="searchParams.title" placeholder="Title" />
-      <input type="text" v-model="searchParams.author" placeholder="Author" />
-
-      <select v-model="searchParams.genre">
+    <div class="filters">
+      <input v-model="filters.search" placeholder="Search books..." />
+      <select v-model="filters.genre">
         <option value="">All Genres</option>
-        <option value="Fiction">Fiction</option>
-        <option value="Non-Fiction">Non-Fiction</option>
-        <option value="Science Fiction">Science Fiction</option>
-        <option value="Mystery">Mystery</option>
-        <option value="Romance">Romance</option>
+        <option v-for="genre in GENRES" :key="genre" :value="genre">
+          {{ genre }}
+        </option>
       </select>
-
-      <input
-        type="number"
-        v-model="searchParams.minPrice"
-        placeholder="Min Price"
-      />
-      <input
-        type="number"
-        v-model="searchParams.maxPrice"
-        placeholder="Max Price"
-      />
-
-      <button @click="searchBooks">Search</button>
-      <button @click="resetFilters">Reset</button>
     </div>
 
     <div class="table-container">
@@ -48,7 +30,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="book in books" :key="book.id">
+          <tr v-for="book in filteredBooks" :key="book.id">
             <td>{{ book.title }}</td>
             <td>{{ book.author }}</td>
             <td>{{ book.category.genre }}</td>
@@ -99,7 +81,7 @@
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import axios from "axios";
 import BookModal from "@/components/BookModal.vue";
 import { useToast } from "@/composables/useToast";
@@ -119,6 +101,14 @@ export default {
     const loading = ref(false);
     const hasMore = ref(true);
     const itemsPerPage = 20;
+    const filters = ref({ search: "", genre: "" });
+    const GENRES = [
+      "Fiction",
+      "Non-Fiction",
+      "Science Fiction",
+      "Mystery",
+      "Romance",
+    ];
 
     const searchParams = ref({
       title: "",
@@ -199,6 +189,23 @@ export default {
       }
     };
 
+    const filteredBooks = computed(() => {
+      return books.value.filter((book) => {
+        const matchesSearch =
+          !filters.value.search ||
+          book.title.toLowerCase().includes(filters.value.search.toLowerCase());
+        const matchesGenre =
+          !filters.value.genre || book.category.genre === filters.value.genre;
+        return matchesSearch && matchesGenre;
+      });
+    });
+
+    const refreshBooks = async () => {
+      books.value = [];
+      page.value = 1;
+      await fetchBooks();
+    };
+
     onMounted(() => {
       fetchBooks();
       window.addEventListener("scroll", handleScroll);
@@ -254,7 +261,7 @@ export default {
           showToast("Book updated successfully", "success");
         }
         showModal.value = false;
-        await fetchBooks(); // Refresh the list
+        await refreshBooks(); // Refresh the list
       } catch (error) {
         showToast("Error saving book", "error");
       }
@@ -269,8 +276,6 @@ export default {
       if (quantity < 10) return "stock-low";
       return "stock-ok";
     };
-
-    onMounted(fetchBooks);
 
     return {
       books,
@@ -289,6 +294,10 @@ export default {
       searchParams,
       searchBooks,
       resetFilters,
+      filteredBooks,
+      refreshBooks,
+      genres: GENRES,
+      filters,
     };
   },
 };
@@ -318,28 +327,21 @@ export default {
   gap: 0.5rem;
 }
 
-.search-filters {
+.filters {
+  margin-bottom: 1.5rem;
   display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 1rem;
 }
 
-.search-filters input,
-.search-filters select {
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
+.filters input,
+.filters select {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
 }
 
-button {
-  padding: 8px 12px;
-  cursor: pointer;
-  border: none;
-  border-radius: 5px;
-}
-
-button:hover {
-  opacity: 0.8;
+.filters input {
+  width: 250px;
 }
 
 .table-container {

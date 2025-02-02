@@ -219,13 +219,11 @@ const authController = {
         updatedAt: new Date(),
       });
 
-      const userDoc = await db.collection("users").doc(userRecord.uid).get();
-
       res.json({
         message: "Verification status synced successfully",
         email: userRecord.email,
         firebaseAuthVerified: userRecord.emailVerified,
-        firestoreVerified: userDoc.data().emailVerified,
+        firestoreVerified: userRecord.emailVerified,
         userId: userRecord.uid,
       });
     } catch (error) {
