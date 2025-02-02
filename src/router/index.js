@@ -7,6 +7,8 @@ import DashboardPage from "@/views/DashboardPage.vue";
 import ManageBooksPage from "@/views/ManageBooksPage.vue";
 import axios from "axios";
 import ProfilePage from "@/views/ProfilePage.vue";
+import CartPage from "@/views/CartPage.vue";
+import OrderDetailsPage from "@/views/OrderDetailsPage.vue";
 
 const requireAuth = async (to, from, next) => {
   try {
@@ -68,6 +70,23 @@ const routes = [
     name: "Profile",
     component: ProfilePage,
     beforeEnter: requireAuth,
+  },
+  {
+    path: "/cart",
+    name: "Cart",
+    component: CartPage,
+  },
+  {
+    path: "/cart",
+    name: "Cart",
+    component: CartPage,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/orders/:id",
+    name: "OrderDetails",
+    component: OrderDetailsPage,
+    meta: { requiresAuth: true },
   },
   {
     path: "/",

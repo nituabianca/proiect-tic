@@ -10,9 +10,7 @@
           <p class="book-author">{{ book.author }}</p>
           <div class="book-pricing">
             <span class="book-price">${{ book.price.toFixed(2) }}</span>
-            <span class="book-stock">
-              In Stock: {{ book.stock.quantity }}
-            </span>
+            <span class="book-stock">In Stock: {{ book.stock.quantity }}</span>
             <button @click="addToCart(book)" class="add-to-cart-btn">
               Add to Cart
             </button>
@@ -23,40 +21,46 @@
     </div>
 
     <div v-if="loading" class="loading-spinner">Loading books...</div>
-
     <div v-if="!loading && books.length === 0" class="no-books">
       No books found
+    </div>
+
+    <!-- Cart Preview -->
+    <div class="cart-preview" v-if="cartItemCount > 0">
+      <div class="cart-count">{{ cartItemCount }} items</div>
+      <div class="cart-total">${{ cartTotal.toFixed(2) }}</div>
+      <router-link to="/cart" class="view-cart-btn">View Cart</router-link>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
+import { useStore } from "vuex";
 import axios from "axios";
 
 export default {
   name: "BooksPage",
   setup() {
+    const store = useStore();
     const books = ref([]);
     const loading = ref(false);
     const page = ref(1);
     const hasMore = ref(true);
     const booksContainer = ref(null);
 
+    const cartItemCount = computed(() => store.getters["cart/itemCount"]);
+    const cartTotal = computed(() => store.getters["cart/cartTotal"]);
+
     const fetchBooks = async () => {
       if (loading.value || !hasMore.value) return;
-
       loading.value = true;
       try {
-        // Modify this API call if you want to add pagination server-side
         const response = await axios.get("/api/books");
         const newBooks = response.data;
-
-        // If no new books, stop loading more
         if (newBooks.length === 0) {
           hasMore.value = false;
         } else {
-          // Append new books
           books.value = [...books.value, ...newBooks];
           page.value++;
         }
@@ -69,18 +73,15 @@ export default {
     };
 
     const handleScroll = () => {
-      // Check if user is near the bottom of the page
       const { scrollTop, clientHeight, scrollHeight } =
         document.documentElement;
-
       if (scrollTop + clientHeight >= scrollHeight - 100 && !loading.value) {
         fetchBooks();
       }
     };
 
     const addToCart = (book) => {
-      // Implement cart logic
-      console.log("Added to cart:", book);
+      store.dispatch("cart/addToCart", book);
     };
 
     onMounted(() => {
@@ -98,13 +99,14 @@ export default {
       hasMore,
       booksContainer,
       addToCart,
+      cartItemCount,
+      cartTotal,
     };
   },
 };
 </script>
 
 <style scoped>
-/* Same styles as previous implementation */
 .books-container {
   padding: 2rem;
   background-color: #f4f6f9;
@@ -205,5 +207,46 @@ export default {
   text-align: center;
   padding: 2rem;
   color: #666;
+}
+.cart-preview {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background-color: white;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 1000;
+}
+
+.cart-count {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.cart-total {
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+.view-cart-btn {
+  background-color: #3498db;
+  color: white;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  text-align: center;
+  transition: background-color 0.3s ease;
+}
+
+.view-cart-btn:hover {
+  background-color: #2980b9;
+}
+
+.low-stock {
+  color: #e74c3c;
 }
 </style>
