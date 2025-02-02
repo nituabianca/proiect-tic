@@ -13,22 +13,39 @@ import OrderDetailsPage from "@/views/OrderDetailsPage.vue";
 const requireAuth = async (to, from, next) => {
   try {
     const token = localStorage.getItem("token");
+    if (!token) {
+      next("/login");
+      return;
+    }
+    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    await axios.get("/api/auth/profile");
+    next();
+  } catch (error) {
+    console.error("Auth check failed:", error);
+    localStorage.removeItem("token");
+    next("/login");
+  }
+};
 
+const requireAdmin = async (to, from, next) => {
+  try {
+    const token = localStorage.getItem("token");
     if (!token) {
       next("/login");
       return;
     }
 
     axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    const response = await axios.get("/api/auth/profile");
 
-    await axios.get("/api/auth/profile");
-
-    next();
+    if (response.data.role === "admin") {
+      next();
+    } else {
+      next("/books");
+    }
   } catch (error) {
-    console.error("Auth check failed:", error);
-
-    localStorage.removeItem("token");
-    next("/login");
+    console.error("Admin check failed:", error);
+    next("/books");
   }
 };
 
@@ -57,13 +74,13 @@ const routes = [
     path: "/dashboard",
     name: "Dashboard",
     component: DashboardPage,
-    beforeEnter: requireAuth,
+    beforeEnter: requireAdmin,
   },
   {
     path: "/books/manage",
     name: "ManageBooks",
     component: ManageBooksPage,
-    beforeEnter: requireAuth,
+    beforeEnter: requireAdmin,
   },
   {
     path: "/profile",
@@ -75,38 +92,23 @@ const routes = [
     path: "/cart",
     name: "Cart",
     component: CartPage,
-  },
-  {
-    path: "/cart",
-    name: "Cart",
-    component: CartPage,
-    meta: { requiresAuth: true },
+    beforeEnter: requireAuth,
   },
   {
     path: "/orders/:id",
     name: "OrderDetails",
     component: OrderDetailsPage,
-    meta: { requiresAuth: true },
+    beforeEnter: requireAuth,
   },
   {
     path: "/",
-    redirect: "/dashboard",
+    redirect: "/books",
   },
 ];
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
-});
-
-router.beforeEach((to, from, next) => {
-  if (to.matched.some((record) => record.meta.requiresAuth)) {
-    if (!localStorage.getItem("token")) {
-      next("/login");
-      return;
-    }
-  }
-  next();
 });
 
 export default router;

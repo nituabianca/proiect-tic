@@ -1,9 +1,10 @@
 <template>
   <div class="dashboard">
     <div class="dashboard-header">
-      <h1>Book Ecommerce Dashboard</h1>
+      <h1>Admin Dashboard</h1>
       <div v-if="user" class="user-section">
         <div class="user-info">
+          <span class="user-role">{{ user.role }}</span>
           <span class="user-email">{{ user.email }}</span>
           <button @click="handleLogout" class="logout-button">Logout</button>
         </div>
@@ -24,50 +25,60 @@
 
           <div class="action-card">
             <h3>Orders</h3>
-            <p>View and manage your recent orders</p>
-            <router-link to="/orders" class="action-button">
-              View Orders
-            </router-link>
-          </div>
-
-          <div class="action-card">
-            <h3>Profile</h3>
-            <p>Update your personal information</p>
-            <router-link to="/profile" class="action-button">
-              Edit Profile
-            </router-link>
+            <p>View and manage customer orders</p>
+            <div class="order-stats">
+              <div class="stat-item">
+                <span class="stat-label">Pending</span>
+                <span class="stat-value">{{ getPendingOrdersCount }}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Processing</span>
+                <span class="stat-value">{{ getProcessingOrdersCount }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="recent-activity">
-        <h2>Recent Activity</h2>
+        <h2>Recent Orders</h2>
         <div v-if="recentOrders.length" class="activity-list">
           <div
             v-for="order in recentOrders"
             :key="order.id"
             class="activity-item"
           >
-            <span class="order-details">
-              Order #<span class="order-id">{{ order.id }}</span> -
-              {{ formatDate(order.dates?.ordered || order.dates?.processed) }}
-            </span>
-            <span
-              class="order-status"
-              :class="(order.status || 'unknown').toLowerCase()"
+            <div class="order-header">
+              <span class="order-details"> Order #{{ order.id }} </span>
+              <span class="order-status" :class="order.orderStatus">
+                {{ order.orderStatus }}
+              </span>
+            </div>
+            <div class="order-info">
+              <div class="order-date">{{ formatDate(order.createdAt) }}</div>
+              <div class="order-amount">${{ order.total?.toFixed(2) }}</div>
+            </div>
+            <select
+              v-model="order.orderStatus"
+              @change="updateOrderStatus(order.id, $event.target.value)"
+              class="status-select"
             >
-              {{ order.status || "Unknown Status" }}
-            </span>
+              <option value="pending">Pending</option>
+              <option value="processing">Processing</option>
+              <option value="shipped">Shipped</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
           </div>
         </div>
-        <p v-else class="no-activity">No recent activity</p>
+        <p v-else class="no-activity">No recent orders</p>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import axios from "axios";
 
@@ -78,13 +89,25 @@ export default {
     const router = useRouter();
     const recentOrders = ref([]);
 
+    const getPendingOrdersCount = computed(() => {
+      return recentOrders.value.filter(
+        (order) => order.orderStatus === "pending"
+      ).length;
+    });
+
+    const getProcessingOrdersCount = computed(() => {
+      return recentOrders.value.filter(
+        (order) => order.orderStatus === "processing"
+      ).length;
+    });
+
     const fetchProfile = async () => {
       try {
-        const response = await axios.get(
-          `${process.env.VUE_APP_API_URL}/api/auth/profile`,
-          { withCredentials: true }
-        );
+        const response = await axios.get("/api/auth/profile");
         user.value = response.data;
+        if (user.value.role !== "admin") {
+          router.push("/books");
+        }
       } catch (error) {
         console.error("Error fetching profile:", error);
         router.push("/login");
@@ -93,35 +116,35 @@ export default {
 
     const fetchRecentOrders = async () => {
       try {
-        const response = await axios.get(
-          `${process.env.VUE_APP_API_URL}/api/orders`,
-          { withCredentials: true }
-        );
-        console.log("Fetched orders:", response.data);
-        recentOrders.value = response.data.slice(0, 5);
+        const response = await axios.get("/api/orders");
+        recentOrders.value = response.data;
       } catch (error) {
-        console.error("Error fetching recent orders:", error);
+        console.error("Error fetching orders:", error);
+      }
+    };
+
+    const updateOrderStatus = async (orderId, status) => {
+      try {
+        await axios.patch(`/api/orders/${orderId}/status`, { status });
+        await fetchRecentOrders();
+      } catch (error) {
+        console.error("Error updating order status:", error);
       }
     };
 
     const handleLogout = async () => {
       try {
-        await axios.post(
-          `${process.env.VUE_APP_API_URL}/api/auth/logout`,
-          {},
-          { withCredentials: true }
-        );
+        await axios.post("/api/auth/logout");
+        localStorage.removeItem("token");
         router.push("/login");
       } catch (error) {
         console.error("Logout error:", error);
       }
     };
 
-    const formatDate = (timestampObj) => {
-      if (!timestampObj || !timestampObj._seconds) return "Invalid Date";
-
-      const date = new Date(timestampObj._seconds * 1000);
-      return date.toLocaleDateString("en-US", {
+    const formatDate = (timestamp) => {
+      if (!timestamp) return "Invalid Date";
+      return new Date(timestamp).toLocaleDateString("en-US", {
         year: "numeric",
         month: "short",
         day: "numeric",
@@ -138,6 +161,9 @@ export default {
       recentOrders,
       handleLogout,
       formatDate,
+      updateOrderStatus,
+      getPendingOrdersCount,
+      getProcessingOrdersCount,
     };
   },
 };
@@ -172,6 +198,15 @@ export default {
   gap: 1rem;
 }
 
+.user-role {
+  background: #3498db;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+}
+
 .user-email {
   font-weight: 500;
   color: #333;
@@ -193,21 +228,13 @@ export default {
 
 .dashboard-content {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 2rem;
-}
-
-.quick-actions h2,
-.recent-activity h2 {
-  border-bottom: 2px solid #e0e4e8;
-  padding-bottom: 0.5rem;
-  margin-bottom: 1rem;
-  color: #333;
 }
 
 .action-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 1rem;
 }
 
@@ -216,31 +243,29 @@ export default {
   border-radius: 8px;
   padding: 1.5rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s ease;
 }
 
-.action-card:hover {
-  transform: translateY(-5px);
-}
-
-.action-card h3 {
-  margin-bottom: 0.5rem;
-  color: #2c3e50;
-}
-
-.action-button {
-  display: inline-block;
+.order-stats {
+  display: flex;
+  justify-content: space-around;
   margin-top: 1rem;
-  background-color: #3498db;
-  color: white;
-  padding: 0.5rem 1rem;
-  text-decoration: none;
-  border-radius: 4px;
-  transition: background-color 0.3s ease;
 }
 
-.action-button:hover {
-  background-color: #2980b9;
+.stat-item {
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #2c3e50;
 }
 
 .recent-activity {
@@ -251,67 +276,68 @@ export default {
 }
 
 .activity-item {
+  padding: 1rem;
+  border-bottom: 1px solid #e0e4e8;
+}
+
+.order-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid #e0e4e8;
+  margin-bottom: 0.5rem;
+}
+
+.order-info {
+  display: flex;
+  justify-content: space-between;
+  color: #666;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.status-select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-top: 0.5rem;
 }
 
 .order-status {
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
-  font-size: 0.8rem;
-}
-
-.order-id {
-  background-color: #ff6a00; /* Bright orange */
-  color: white;
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-weight: bold;
-}
-
-.order-status {
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-weight: bold;
+  font-size: 0.875rem;
 }
 
 .order-status.pending {
-  background-color: #ffa500; /* Orange */
-  color: white;
+  background: #fff3cd;
+  color: #856404;
 }
-
 .order-status.processing {
-  background-color: #1e90ff; /* Dodger Blue */
-  color: white;
+  background: #cce5ff;
+  color: #004085;
 }
-
 .order-status.shipped {
-  background-color: #4caf50; /* Green */
-  color: white;
+  background: #d4edda;
+  color: #155724;
 }
-
 .order-status.delivered {
-  background-color: #2e8b57; /* Sea Green */
-  color: white;
+  background: #d1e7dd;
+  color: #0f5132;
 }
-
 .order-status.cancelled {
-  background-color: #dc143c; /* Crimson */
-  color: white;
-}
-
-.no-activity {
-  text-align: center;
-  color: #7f8c8d;
-  padding: 1rem;
+  background: #f8d7da;
+  color: #721c24;
 }
 
 @media (max-width: 768px) {
   .dashboard-content {
     grid-template-columns: 1fr;
+  }
+
+  .user-info {
+    flex-direction: column;
+    align-items: flex-end;
   }
 }
 </style>

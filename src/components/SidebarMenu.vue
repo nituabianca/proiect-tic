@@ -11,7 +11,7 @@
 
     <nav class="nav-menu">
       <router-link
-        v-for="item in menuItems"
+        v-for="item in filteredMenuItems"
         :key="item.path"
         :to="item.path"
         class="nav-item"
@@ -22,13 +22,21 @@
         </div>
         <span v-if="!isCollapsed" class="nav-text">{{ item.name }}</span>
       </router-link>
+
+      <button @click="handleLogout" class="nav-item logout-btn">
+        <div class="nav-icon">
+          <font-awesome-icon icon="sign-out-alt" />
+        </div>
+        <span v-if="!isCollapsed" class="nav-text">Logout</span>
+      </button>
     </nav>
   </div>
 </template>
 
 <script>
 import { computed } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
+import { useStore } from "vuex";
 import { library } from "@fortawesome/fontawesome-svg-core";
 import {
   faUser,
@@ -38,8 +46,10 @@ import {
   faCog,
   faChevronLeft,
   faChevronRight,
+  faSignOutAlt,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import axios from "axios";
 
 library.add(
   faHome,
@@ -48,7 +58,8 @@ library.add(
   faUser,
   faCog,
   faChevronLeft,
-  faChevronRight
+  faChevronRight,
+  faSignOutAlt
 );
 
 export default {
@@ -65,24 +76,47 @@ export default {
   emits: ["toggle"],
   setup(props, { emit }) {
     const route = useRoute();
+    const router = useRouter();
+    const store = useStore();
     const currentRoute = computed(() => route.path);
+    const isAdmin = computed(() => store.state.auth.user?.role === "admin");
 
-    const menuItems = [
+    const adminMenuItems = [
       { name: "Dashboard", path: "/dashboard", icon: "home" },
       { name: "Books", path: "/books", icon: "book" },
       { name: "Cart", path: "/cart", icon: "shopping-cart" },
       { name: "Profile", path: "/profile", icon: "user" },
-      { name: "Settings", path: "/settings", icon: "cog" },
     ];
+
+    const userMenuItems = [
+      { name: "Books", path: "/books", icon: "book" },
+      { name: "Cart", path: "/cart", icon: "shopping-cart" },
+      { name: "Profile", path: "/profile", icon: "user" },
+    ];
+
+    const filteredMenuItems = computed(() =>
+      isAdmin.value ? adminMenuItems : userMenuItems
+    );
+
+    const handleLogout = async () => {
+      try {
+        await axios.post("/api/auth/logout");
+        localStorage.removeItem("token");
+        router.push("/login");
+      } catch (error) {
+        console.error("Logout error:", error);
+      }
+    };
 
     const toggleSidebar = () => {
       emit("toggle", !props.isCollapsed);
     };
 
     return {
-      menuItems,
+      filteredMenuItems,
       currentRoute,
       toggleSidebar,
+      handleLogout,
     };
   },
 };
@@ -134,7 +168,7 @@ export default {
   border-radius: 50%;
   width: 24px;
   height: 24px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   color: #1a237e;
   display: flex;
@@ -193,5 +227,21 @@ export default {
 
 .collapsed .nav-icon {
   margin-right: 0;
+}
+
+.logout-btn {
+  margin-top: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  color: rgba(255, 255, 255, 0.8);
+  transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+  background-color: rgba(255, 105, 97, 0.2);
+  color: rgb(255, 105, 97);
+  transform: translateX(5px);
 }
 </style>

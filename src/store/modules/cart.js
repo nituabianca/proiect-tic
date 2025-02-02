@@ -73,13 +73,25 @@ const actions = {
   async checkout({ commit, state }) {
     commit("SET_LOADING", true);
     try {
-      const response = await axios.post("/api/orders", {
-        items: state.items,
+      const orderData = {
+        items: state.items.map((item) => ({
+          id: item.id,
+          title: item.title,
+          price: item.price,
+          quantity: item.quantity,
+          author: item.author,
+          cover: item.cover,
+        })),
         total: state.items.reduce(
           (sum, item) => sum + item.price * item.quantity,
           0
         ),
-      });
+        orderStatus: "pending",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const response = await axios.post("/api/orders", orderData);
       commit("CLEAR_CART");
       return response.data;
     } catch (error) {

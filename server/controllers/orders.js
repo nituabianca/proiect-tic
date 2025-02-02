@@ -10,6 +10,7 @@ const orderController = {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
+
       const docRef = await db.collection("orders").add(orderData);
       const newOrder = await docRef.get();
 
@@ -23,7 +24,6 @@ const orderController = {
     }
   },
 
-  // Modified for admin access to all orders
   async getAllOrders(req, res) {
     try {
       const snapshot = await db.collection("orders").get();
@@ -37,12 +37,12 @@ const orderController = {
     }
   },
 
-  // New method for users to get their orders
   async getMyOrders(req, res) {
     try {
       const snapshot = await db
         .collection("orders")
         .where("userId", "==", req.user.uid)
+        .orderBy("createdAt", "desc")
         .get();
 
       const orders = snapshot.docs.map((doc) => ({
@@ -50,6 +50,28 @@ const orderController = {
         ...doc.data(),
       }));
       res.json(orders);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  async getMyOrderById(req, res) {
+    try {
+      const doc = await db.collection("orders").doc(req.params.id).get();
+
+      if (!doc.exists) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const order = doc.data();
+      if (order.userId !== req.user.uid) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      res.json({
+        id: doc.id,
+        ...order,
+      });
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -79,7 +101,6 @@ const orderController = {
     }
   },
 
-  // Admin-only methods remain unchanged
   async updateOrder(req, res) {
     try {
       const orderId = req.params.id;
@@ -171,7 +192,6 @@ const orderController = {
     }
   },
 
-  // Admin-only method
   async generateMockOrders(req, res) {
     try {
       const ordersCount = req.body.orders_count || 50;

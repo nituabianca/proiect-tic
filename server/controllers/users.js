@@ -62,8 +62,13 @@ const userController = {
 
   async getUserById(req, res) {
     try {
-      const doc = await db.collection("users").doc(req.params.id).get();
+      if (req.user.role !== "admin" && req.user.uid !== req.params.id) {
+        return res
+          .status(403)
+          .json({ error: "Can only view your own profile" });
+      }
 
+      const doc = await db.collection("users").doc(req.params.id).get();
       if (!doc.exists) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -80,10 +85,16 @@ const userController = {
   async updateUser(req, res) {
     try {
       const userId = req.params.id;
+
+      if (req.user.role !== "admin" && req.user.uid !== userId) {
+        return res
+          .status(403)
+          .json({ error: "Can only update your own profile" });
+      }
+
       const updateData = req.body;
       const userRef = db.collection("users").doc(userId);
 
-      // Update in Firestore
       await userRef.update({
         ...updateData,
         updatedAt: new Date(),
@@ -113,9 +124,7 @@ const userController = {
       const userId = req.params.id;
 
       await admin.auth().deleteUser(userId);
-
       await db.collection("users").doc(userId).delete();
-
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -124,10 +133,13 @@ const userController = {
 
   async getUserOrders(req, res) {
     try {
-      const userId = req.params.id;
+      if (req.user.role !== "admin" && req.user.uid !== req.params.id) {
+        return res.status(403).json({ error: "Can only view your own orders" });
+      }
+
       const ordersSnapshot = await db
         .collection("orders")
-        .where("userId", "==", userId)
+        .where("userId", "==", req.params.id)
         .get();
 
       const orders = ordersSnapshot.docs.map((doc) => ({

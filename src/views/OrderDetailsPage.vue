@@ -64,7 +64,7 @@ export default {
 
     const fetchOrder = async () => {
       try {
-        const response = await axios.get(`/api/orders/${route.params.id}`);
+        const response = await axios.get(`/api/orders/my/${route.params.id}`);
         order.value = response.data;
       } catch (err) {
         error.value = "Failed to load order details";
