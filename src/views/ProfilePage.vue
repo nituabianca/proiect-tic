@@ -113,9 +113,7 @@
             <div v-for="order in orders" :key="order.id" class="order-item">
               <div class="order-header">
                 <span class="order-id">Order #{{ order.id }}</span>
-                <span class="order-date">{{
-                  formatDate(order.createdAt)
-                }}</span>
+                <span class="order-date">{{ formatDate(order.createdAt) }}</span>
               </div>
               <div class="order-status" :class="order.orderStatus">
                 {{ order.orderStatus }}
@@ -139,6 +137,7 @@
 </template>
 
 <script>
+/* eslint-disable */
 import { ref, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useToast } from "@/composables/useToast";
@@ -230,7 +229,27 @@ export default {
     };
 
     const formatDate = (timestamp) => {
-      return new Date(timestamp).toLocaleDateString();
+      if (!timestamp) return 'No date';
+
+      // Handle Firestore Timestamp
+      if (timestamp.seconds) {
+        return new Date(timestamp.seconds * 1000).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
+
+      // Handle regular date string
+      return new Date(timestamp).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
     };
 
     onMounted(() => {

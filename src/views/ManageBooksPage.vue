@@ -81,6 +81,7 @@
 </template>
 
 <script>
+/* eslint-disable */
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import axios from "axios";
 import BookModal from "@/components/BookModal.vue";

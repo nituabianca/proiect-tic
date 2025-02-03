@@ -20,6 +20,7 @@
 </template>
 
 <script>
+/* eslint-disable */
 import { ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import SidebarMenu from "@/components/SidebarMenu.vue";

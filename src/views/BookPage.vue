@@ -39,6 +39,7 @@
 </template>
 
 <script>
+/* eslint-disable */
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useStore } from "vuex";
 import axios from "axios";

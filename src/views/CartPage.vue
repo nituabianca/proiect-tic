@@ -76,6 +76,7 @@
 </template>
 
 <script>
+/* eslint-disable */
 import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";

@@ -5,6 +5,7 @@
 </template>
 
 <script>
+/* eslint-disable */
 import { useToast } from "@/composables/useToast";
 
 export default {

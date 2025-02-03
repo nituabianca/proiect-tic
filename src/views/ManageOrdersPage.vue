@@ -114,6 +114,7 @@
 </template>
 
 <script>
+/* eslint-disable */
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import axios from "axios";

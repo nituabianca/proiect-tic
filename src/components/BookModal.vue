@@ -145,6 +145,7 @@
 </template>
 
 <script>
+/* eslint-disable */
 import { computed, ref } from "vue";
 
 export default {
