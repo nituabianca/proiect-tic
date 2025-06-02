@@ -1,166 +1,95 @@
-const { db } = require("../firebase/firebase");
-const { generateMockOrder } = require("../helpers/orders");
+// backend/controllers/orderController.js
+const orderService = require("../services/orders");
+const { deleteCache } = require("../utils/cache"); // Import deleteCache
 
 const orderController = {
   async createOrder(req, res) {
     try {
-      const orderData = {
-        ...req.body,
-        userId: req.user.uid,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+      const userId = req.user.uid;
+      const orderData = { ...req.body, userId }; // Ensure userId is set
 
-      const docRef = await db.collection("orders").add(orderData);
-      const newOrder = await docRef.get();
+      const newOrder = await orderService.createOrder(orderData);
 
-      res.status(201).json({
-        id: docRef.id,
-        ...newOrder.data(),
-      });
+      // Invalidate relevant user's read book IDs cache and recommendations
+      deleteCache(`user_read_book_ids_${userId}`);
+      deleteCache(`user_based_recommendations_${userId}`);
+      deleteCache(`item_based_recommendations_${userId}`);
+
+      res
+        .status(201)
+        .json({ message: "Order created successfully", order: newOrder });
     } catch (error) {
       console.error("Error creating order:", error);
-      res.status(500).json({ error: error.message });
+      res
+        .status(500)
+        .json({ error: error.message || "Failed to create order" });
     }
   },
 
   async getAllOrders(req, res) {
     try {
-      const snapshot = await db.collection("orders").get();
-      const orders = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const orders = await orderService.getAllOrders();
       res.json(orders);
     } catch (error) {
+      console.error("Error getting all orders:", error);
       res.status(500).json({ error: error.message });
     }
   },
 
-  async getMyOrders(req, res) {
+  async getUserOrders(req, res) {
     try {
-      const snapshot = await db
-        .collection("orders")
-        .where("userId", "==", req.user.uid)
-        .orderBy("createdAt", "desc")
-        .get();
-
-      const orders = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      // Allow admin to get other user's orders, otherwise default to current user
+      const userId =
+        req.user.role === "admin" && req.params.userId
+          ? req.params.userId
+          : req.user.uid;
+      const orders = await orderService.getOrdersByUserId(userId);
       res.json(orders);
     } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  },
-
-  async getMyOrderById(req, res) {
-    try {
-      const doc = await db.collection("orders").doc(req.params.id).get();
-
-      if (!doc.exists) {
-        return res.status(404).json({ message: "Order not found" });
-      }
-
-      const order = doc.data();
-      if (order.userId !== req.user.uid) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      res.json({
-        id: doc.id,
-        ...order,
-      });
-    } catch (error) {
+      console.error("Error getting user orders:", error);
       res.status(500).json({ error: error.message });
     }
   },
 
   async getOrderById(req, res) {
     try {
-      const doc = await db.collection("orders").doc(req.params.id).get();
-
-      if (!doc.exists) {
-        return res.status(404).json({ message: "Order not found" });
+      const order = await orderService.getOrderById(req.params.id);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found." });
       }
-
-      const order = doc.data();
-
-      // Check if user has access to this order
-      if (req.user.role !== "admin" && order.userId !== req.user.uid) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      res.json({
-        id: doc.id,
-        ...order,
-      });
+      res.json(order);
     } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  },
-
-  async updateOrder(req, res) {
-    try {
-      const orderId = req.params.id;
-      const updateData = req.body;
-      const orderRef = db.collection("orders").doc(orderId);
-
-      await orderRef.update({
-        ...updateData,
-        updatedAt: new Date(),
-      });
-
-      const updated = await orderRef.get();
-      res.json({
-        id: updated.id,
-        ...updated.data(),
-      });
-    } catch (error) {
-      console.error("Error updating order:", error);
-      res.status(500).json({ error: error.message });
-    }
-  },
-
-  async deleteOrder(req, res) {
-    try {
-      const orderId = req.params.id;
-      await db.collection("orders").doc(orderId).delete();
-      res.status(204).send();
-    } catch (error) {
-      console.error("Error deleting order:", error);
+      console.error("Error getting order by ID:", error);
       res.status(500).json({ error: error.message });
     }
   },
 
   async updateOrderStatus(req, res) {
     try {
-      const { id } = req.params;
       const { status } = req.body;
-
-      if (
-        ![
-          "pending",
-          "processing",
-          "shipped",
-          "delivered",
-          "cancelled",
-        ].includes(status)
-      ) {
-        return res.status(400).json({ error: "Invalid order status" });
+      const updatedOrder = await orderService.updateOrderStatus(
+        req.params.id,
+        status
+      );
+      if (!updatedOrder) {
+        return res.status(404).json({ error: "Order not found." });
       }
 
-      const orderRef = db.collection("orders").doc(id);
-      await orderRef.update({
-        orderStatus: status,
-        updatedAt: new Date(),
-      });
+      // If order status implies reading progress (e.g., "completed"), invalidate caches.
+      // This logic depends on how you track `user_book_progress`.
+      // For now, let's assume if an order is completed, it contributes to read books.
+      if (updatedOrder.userId && status === "completed") {
+        // This assumes the `user_book_progress` collection is updated separately
+        // (e.g., a "mark as read" endpoint). If marking an order complete also marks books as read,
+        // then these cache invalidations are relevant.
+        deleteCache(`user_read_book_ids_${updatedOrder.userId}`);
+        deleteCache(`user_based_recommendations_${updatedOrder.userId}`);
+        deleteCache(`item_based_recommendations_${updatedOrder.userId}`);
+      }
 
-      const updated = await orderRef.get();
       res.json({
-        id: updated.id,
-        ...updated.data(),
+        message: "Order status updated successfully",
+        order: updatedOrder,
       });
     } catch (error) {
       console.error("Error updating order status:", error);
@@ -168,58 +97,25 @@ const orderController = {
     }
   },
 
-  async getOrdersByStatus(req, res) {
+  async deleteOrder(req, res) {
     try {
-      let query = db
-        .collection("orders")
-        .where("orderStatus", "==", req.params.status);
-
-      // If not admin, only show user's orders
-      if (req.user.role !== "admin") {
-        query = query.where("userId", "==", req.user.uid);
+      const order = await orderService.getOrderById(req.params.id); // Get order first to know userId
+      const success = await orderService.deleteOrder(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Order not found." });
       }
 
-      const snapshot = await query.get();
-      const orders = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      // If deleting an order means books are no longer "read" (unlikely, but for completeness)
+      if (order && order.userId) {
+        deleteCache(`user_read_book_ids_${order.userId}`);
+        deleteCache(`user_based_recommendations_${order.userId}`);
+        deleteCache(`item_based_recommendations_${order.userId}`);
+      }
 
-      res.json(orders);
+      res.json({ message: "Order deleted successfully." });
     } catch (error) {
-      console.error("Error getting orders by status:", error);
+      console.error("Error deleting order:", error);
       res.status(500).json({ error: error.message });
-    }
-  },
-
-  async generateMockOrders(req, res) {
-    try {
-      const ordersCount = req.body.orders_count || 50;
-      const batch = db.batch();
-      const generatedOrders = [];
-
-      for (let i = 0; i < ordersCount; i++) {
-        const docRef = db.collection("orders").doc();
-        const order = generateMockOrder();
-        order.id = docRef.id;
-
-        batch.set(docRef, order);
-        generatedOrders.push(order);
-      }
-
-      await batch.commit();
-      console.log(`Generated ${ordersCount} orders`);
-
-      return res.status(201).json({
-        message: `${ordersCount} orders were generated successfully`,
-        count: generatedOrders.length,
-        orders: generatedOrders,
-      });
-    } catch (error) {
-      console.error("Error generating orders:", error);
-      return res.status(500).json({
-        error: error.message || "Failed to generate orders",
-      });
     }
   },
 };

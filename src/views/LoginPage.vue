@@ -38,6 +38,9 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import axios from "axios";
+// Import Firebase auth service
+import { auth } from "@/firebase"; // <--- Make sure this path is correct for your firebase.js export
+import { signInWithEmailAndPassword } from "firebase/auth"; // <--- Import signInWithEmailAndPassword
 
 export default {
   name: "LoginPage",
@@ -49,13 +52,30 @@ export default {
     const store = useStore();
 
     const handleLogin = async () => {
+      errorMessage.value = ""; // Clear previous errors
       try {
-        const response = await axios.post(`/api/auth/login`, {
-          email: email.value,
-          password: password.value,
-        });
+        // Step 1: Log in with Firebase Authentication (client-side)
+        const userCredential = await signInWithEmailAndPassword(
+          auth,
+          email.value,
+          password.value
+        );
+        const firebaseUser = userCredential.user;
 
-        localStorage.setItem("token", response.data.token);
+        // Step 2: Get Firebase ID Token
+        const idToken = await firebaseUser.getIdToken();
+        console.log("FRONTEND: Newly acquired Firebase ID Token:", idToken);
+        console.log("FRONTEND: Token generation time (roughly):", new Date());
+        console.log("Firebase ID Token:", idToken); // For debugging, remove in production
+
+        // Step 3: Send Firebase ID Token to your backend for custom JWT exchange
+        const response = await axios.post(`/api/auth/login`, {
+          idToken: idToken, // <--- Send the Firebase ID Token
+        });
+        console.log("FRONTEND: Sending this ID Token to backend:", idToken);
+
+        // Step 4: Handle response from your backend (which returns your custom JWT)
+        localStorage.setItem("token", response.data.token); // Your custom JWT
         axios.defaults.headers.common[
           "Authorization"
         ] = `Bearer ${response.data.token}`;
@@ -65,13 +85,30 @@ export default {
 
         router.push("/dashboard");
       } catch (error) {
-        if (error.response?.data?.needsVerification) {
-          router.push({
-            path: "/verify-email",
-            query: { email: email.value },
-          });
+        console.error("Login Error:", error);
+        if (error.code) {
+          // Firebase specific errors
+          switch (error.code) {
+            case "auth/user-not-found":
+            case "auth/wrong-password":
+              errorMessage.value = "Invalid email or password.";
+              break;
+            case "auth/invalid-email":
+              errorMessage.value = "Please enter a valid email address.";
+              break;
+            case "auth/user-disabled":
+              errorMessage.value = "This account has been disabled.";
+              break;
+            // Add more Firebase error codes as needed
+            default:
+              errorMessage.value =
+                "Authentication failed. Please try again. (" + error.code + ")";
+          }
+        } else if (error.response?.data?.error) {
+          // Backend specific errors
+          errorMessage.value = error.response.data.error;
         } else {
-          errorMessage.value = error.response?.data?.error || "Login failed";
+          errorMessage.value = "Login failed. An unexpected error occurred.";
         }
       }
     };
@@ -87,6 +124,7 @@ export default {
 </script>
 
 <style scoped>
+/* Your existing styles */
 .login-container {
   display: flex;
   justify-content: center;

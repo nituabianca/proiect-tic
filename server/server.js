@@ -1,8 +1,9 @@
+// backend/server.js
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const cookieParser = require("cookie-parser");
-const routes = require("./routes");
+const routes = require("./routes"); // Importul principal al rutelor
 
 dotenv.config();
 
@@ -10,21 +11,20 @@ const app = express();
 
 app.use(
   cors({
-    origin: "http://localhost:3002", // Frontend URL
+    origin: "http://localhost:3001", // Frontend URL
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-// Add OPTIONS handler
-app.options("*", cors());
+app.options("*", cors()); // Add OPTIONS handler
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
-app.use("/api", routes);
+app.use("/api", routes); // Toate rutele din `routes/index.js` vor fi prefixate cu /api
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

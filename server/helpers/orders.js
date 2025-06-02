@@ -1,3 +1,4 @@
+// backend/helpers/orders.js
 const { faker } = require("@faker-js/faker");
 
 const generateMockOrder = (options = {}) => {

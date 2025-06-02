@@ -1,23 +1,31 @@
 const express = require("express");
-const router = express.Router();
 const bookController = require("../controllers/books");
-const {
-  authMiddleware,
-  adminMiddleware,
-  userMiddleware,
-} = require("../middlewares/auth");
+const authMiddleware = require("../middlewares/auth");
+const adminMiddleware = require("../middlewares/admin"); // Correct import path
 
-// Public routes
+const router = express.Router();
+
+// Public routes (no authentication required for viewing/searching books)
 router.get("/", bookController.getAllBooks);
 router.get("/search", bookController.searchBooks);
 router.get("/:id", bookController.getBookById);
 
-// Admin only routes
-router.use(authMiddleware, adminMiddleware);
-router.post("/", bookController.createBook);
-router.put("/:id", bookController.updateBook);
-router.delete("/:id", bookController.deleteBook);
-router.patch("/:id/stock", bookController.updateBookStock);
-router.post("/generate", bookController.generateMockBooks);
+// Admin-only routes (for managing books)
+router.post("/", authMiddleware, adminMiddleware, bookController.createBook);
+router.put("/:id", authMiddleware, adminMiddleware, bookController.updateBook);
+router.delete(
+  "/:id",
+  authMiddleware,
+  adminMiddleware,
+  bookController.deleteBook
+);
+
+// Specific route for stock update (admin only)
+router.patch(
+  "/:id/stock",
+  authMiddleware,
+  adminMiddleware,
+  bookController.updateBookStock
+);
 
 module.exports = router;

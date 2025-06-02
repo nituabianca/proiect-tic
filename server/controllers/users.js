@@ -1,120 +1,53 @@
-const { db, admin } = require("../firebase/firebase");
-const { generateMockUser } = require("../helpers/users");
+// backend/controllers/userController.js
+const userService = require("../services/user");
+const { deleteCache } = require("../utils/cache"); // Import deleteCache
 
 const userController = {
-  async generateMockUsers(req, res) {
-    try {
-      const usersCount = req.body.users_count || 10;
-      const batch = db.batch();
-      const generatedUsers = [];
-
-      for (let i = 0; i < usersCount; i++) {
-        const mockUser = generateMockUser();
-        const docRef = db.collection("users").doc();
-
-        try {
-          const userRecord = await admin.auth().createUser({
-            email: mockUser.email,
-            password: mockUser.password,
-            displayName: `${mockUser.firstName} ${mockUser.lastName}`,
-          });
-
-          mockUser.id = userRecord.uid;
-          batch.set(docRef, mockUser);
-          generatedUsers.push(mockUser);
-        } catch (error) {
-          console.error(`Failed to create user ${mockUser.email}:`, error);
-          continue;
-        }
-      }
-
-      await batch.commit();
-      console.log(`Generated ${generatedUsers.length} users`);
-
-      return res.status(201).json({
-        message: `${generatedUsers.length} users were generated successfully`,
-        count: generatedUsers.length,
-        users: generatedUsers.map((user) => ({
-          ...user,
-          password: undefined,
-        })),
-      });
-    } catch (error) {
-      console.error("Error generating users:", error);
-      return res.status(500).json({
-        error: error.message || "Failed to generate users",
-      });
-    }
-  },
-
   async getAllUsers(req, res) {
     try {
-      const snapshot = await db.collection("users").get();
-      const users = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const users = await userService.getAllUsers();
       res.json(users);
     } catch (error) {
+      console.error("Error getting all users:", error);
       res.status(500).json({ error: error.message });
     }
   },
 
   async getUserById(req, res) {
     try {
-      if (req.user.role !== "admin" && req.user.uid !== req.params.id) {
-        return res
-          .status(403)
-          .json({ error: "Can only view your own profile" });
+      const user = await userService.queryById(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found." });
       }
-
-      const doc = await db.collection("users").doc(req.params.id).get();
-      if (!doc.exists) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      res.json({
-        id: doc.id,
-        ...doc.data(),
-      });
+      res.json(user);
     } catch (error) {
+      console.error("Error getting user by ID:", error);
       res.status(500).json({ error: error.message });
     }
   },
 
   async updateUser(req, res) {
     try {
-      const userId = req.params.id;
+      const userId = req.params.id; // User ID from URL
+      const updateData = req.body; // Data to update
 
-      if (req.user.role !== "admin" && req.user.uid !== userId) {
-        return res
-          .status(403)
-          .json({ error: "Can only update your own profile" });
+      const updatedUser = await userService.updateUser(userId, updateData);
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found." });
       }
 
-      const updateData = req.body;
-      const userRef = db.collection("users").doc(userId);
+      // Invalidate user-specific caches if user data changes
+      // especially if preferences or other fields affecting recommendations change
+      deleteCache(`user_ratings_map_${userId}`);
+      deleteCache(`user_based_recommendations_${userId}`);
+      deleteCache(`item_based_recommendations_${userId}`);
+      deleteCache(`similar_users_${userId}`);
+      // If user's read book progress changes (handled via order/rating controller)
+      // deleteCache(`user_read_book_ids_${userId}`); // This key would be in bookService.js if we cached it.
 
-      await userRef.update({
-        ...updateData,
-        updatedAt: new Date(),
-      });
-
-      if (updateData.firstName || updateData.lastName) {
-        const newDisplayName = `${updateData.firstName || ""} ${
-          updateData.lastName || ""
-        }`.trim();
-        await admin.auth().updateUser(userId, {
-          displayName: newDisplayName,
-        });
-      }
-
-      const updated = await userRef.get();
-      res.json({
-        id: updated.id,
-        ...updated.data(),
-      });
+      res.json({ message: "User updated successfully", user: updatedUser });
     } catch (error) {
+      console.error("Error updating user:", error);
       res.status(500).json({ error: error.message });
     }
   },
@@ -122,33 +55,23 @@ const userController = {
   async deleteUser(req, res) {
     try {
       const userId = req.params.id;
-
-      await admin.auth().deleteUser(userId);
-      await db.collection("users").doc(userId).delete();
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ error: error.message });
-    }
-  },
-
-  async getUserOrders(req, res) {
-    try {
-      if (req.user.role !== "admin" && req.user.uid !== req.params.id) {
-        return res.status(403).json({ error: "Can only view your own orders" });
+      const success = await userService.deleteUser(userId); // This is where the magic happens
+      if (!success) {
+        return res
+          .status(404)
+          .json({ error: "User not found or could not be deleted." });
       }
+      // Invalidate all caches related to this user
+      deleteCache(`user_ratings_map_${userId}`);
+      deleteCache(`user_based_recommendations_${userId}`);
+      deleteCache(`item_based_recommendations_${userId}`);
+      deleteCache(`similar_users_${userId}`);
+      // Clear specific read book IDs for this user
+      deleteCache(`user_read_book_ids_${userId}`); // Assuming this cache key exists in bookService
 
-      const ordersSnapshot = await db
-        .collection("orders")
-        .where("userId", "==", req.params.id)
-        .get();
-
-      const orders = ordersSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
-      res.json(orders);
+      res.json({ message: "User and associated data deleted successfully." });
     } catch (error) {
+      console.error("Error deleting user:", error);
       res.status(500).json({ error: error.message });
     }
   },

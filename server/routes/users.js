@@ -1,20 +1,21 @@
 const express = require("express");
-const router = express.Router();
 const userController = require("../controllers/users");
-const {
+const authMiddleware = require("../middlewares/auth");
+const adminMiddleware = require("../middlewares/admin");
+const userMiddleware = require("../middlewares/user"); // Correct import path
+
+const router = express.Router();
+
+// Admin-only routes
+router.get("/", authMiddleware, adminMiddleware, userController.getAllUsers);
+router.get("/:id", authMiddleware, adminMiddleware, userController.getUserById);
+router.delete(
+  "/:id",
   authMiddleware,
   adminMiddleware,
-  userMiddleware,
-} = require("../middlewares/auth");
-
-router.post("/generate", adminMiddleware, userController.generateMockUsers);
-router.get("/", adminMiddleware, userController.getAllUsers);
-
-router.use(authMiddleware);
-router.get("/:id", userMiddleware, userController.getUserById);
-router.put("/:id", userMiddleware, userController.updateUser);
-router.get("/:id/orders", userMiddleware, userController.getUserOrders);
-
-router.delete("/:id", adminMiddleware, userController.deleteUser);
+  userController.deleteUser
+);
+// User-specific routes (user can only update their own profile)
+router.put("/:id", authMiddleware, userMiddleware, userController.updateUser); // Correctly uses userMiddleware for self-access/admin access
 
 module.exports = router;

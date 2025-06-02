@@ -228,6 +228,7 @@ export default {
       }
     };
 
+
     const formatDate = (timestamp) => {
       if (!timestamp) return 'No date';
 
@@ -251,7 +252,6 @@ export default {
         minute: '2-digit'
       });
     };
-
     onMounted(() => {
       fetchProfile();
       fetchOrders();

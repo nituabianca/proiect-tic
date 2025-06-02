@@ -1,20 +1,39 @@
 const express = require("express");
-const router = express.Router();
 const orderController = require("../controllers/orders");
-const { authMiddleware, adminMiddleware } = require("../middlewares/auth");
+const authMiddleware = require("../middlewares/auth");
+const adminMiddleware = require("../middlewares/admin");
+const userMiddleware = require("../middlewares/user"); // Correct import path
 
-router.use(authMiddleware);
-router.get("/my", orderController.getMyOrders);
-router.get("/my/:id", orderController.getMyOrderById);
-router.post("/", orderController.createOrder);
+const router = express.Router();
 
-router.use(adminMiddleware);
-router.get("/", orderController.getAllOrders);
-router.get("/:id", orderController.getOrderById);
-router.get("/status/:status", orderController.getOrdersByStatus);
-router.put("/:id", orderController.updateOrder);
-router.delete("/:id", orderController.deleteOrder);
-router.patch("/:id/status", orderController.updateOrderStatus);
-router.post("/generate", orderController.generateMockOrders);
+// Authenticated user can create an order
+router.post("/", authMiddleware, orderController.createOrder); // Correctly protected by authMiddleware
+
+// Authenticated user can view their own orders
+router.get("/my-orders", authMiddleware, orderController.getUserOrders); // Correctly protected by authMiddleware
+
+// Admin-only routes
+router.get("/", authMiddleware, adminMiddleware, orderController.getAllOrders); // Correct
+router.get(
+  "/:id",
+  authMiddleware,
+  adminMiddleware,
+  orderController.getOrderById
+); // Correct
+router.put(
+  "/:id/status",
+  authMiddleware,
+  adminMiddleware,
+  orderController.updateOrderStatus
+); // Correct
+router.delete(
+  "/:id",
+  authMiddleware,
+  adminMiddleware,
+  orderController.deleteOrder
+); // Correct
+
+// For an admin to see orders of a specific user (if you have this scenario)
+// router.get('/user/:userId', authMiddleware, adminMiddleware, orderController.getUserOrders); // (Commented out, but correct usage if enabled)
 
 module.exports = router;
