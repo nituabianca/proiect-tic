@@ -11,6 +11,8 @@ node_modules
 /.env
 server/.env
 
+
+
 # Log files
 npm-debug.log*
 yarn-debug.log*
