@@ -34,8 +34,7 @@
 </template>
 
 <script>
-/* eslint-disable */
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
@@ -51,7 +50,6 @@ import {
   faSignOutAlt,
   faClipboardList,
 } from "@fortawesome/free-solid-svg-icons";
-import axios from "axios";
 
 library.add(
   faHome,
@@ -79,14 +77,17 @@ export default {
   emits: ["toggle"],
 
   setup(props, { emit }) {
-    /*eslint-disable*/
     const store = useStore();
     const route = useRoute();
     const router = useRouter();
-    const userRole = ref(null);
 
     const currentRoute = computed(() => route.path);
+    // Directly use the isAdmin getter from the store
+    const isAdmin = computed(() => store.getters["auth/isAdmin"]);
+    // Also get the full user object from store for potential re-fetches if needed
+    const currentUser = computed(() => store.getters["auth/getUser"]);
 
+    // Define menu items based on role
     const adminMenuItems = [
       { name: "Dashboard", path: "/dashboard", icon: "home" },
       { name: "Books", path: "/books", icon: "book" },
@@ -102,28 +103,44 @@ export default {
       { name: "Profile", path: "/profile", icon: "user" },
     ];
 
-    const fetchUserRole = async () => {
-      try {
-        const response = await axios.get("/api/auth/profile");
-        userRole.value = response.data.role;
-      } catch (error) {
-        console.error("Error fetching user role:", error);
-      }
-    };
-
-    onMounted(fetchUserRole);
-
+    // Compute menu items based on the isAdmin getter
     const menuItems = computed(() =>
-      userRole.value === "admin" ? adminMenuItems : userMenuItems
+      isAdmin.value ? adminMenuItems : userMenuItems
     );
+
+    // Initial fetch of profile when component mounts (if user is authenticated but no user data in store)
+    // This is a fallback/redundancy for store's initialisation/router guard
+    onMounted(async () => {
+      if (store.getters["auth/isAuthenticated"] && !currentUser.value) {
+        try {
+          await store.dispatch("auth/fetchUserProfile");
+          console.log(
+            "SidebarMenu: User profile re-fetched on mount as it was missing."
+          );
+        } catch (error) {
+          console.error(
+            "SidebarMenu: Failed to re-fetch user profile on mount:",
+            error
+          );
+          // If this fails, the navigation guard should have already handled the logout/redirect
+          // But as a safeguard, ensure logout happens if token is bad
+          if (error.response && error.response.status === 401) {
+            await store.dispatch("auth/logout");
+            router.push("/login");
+          }
+        }
+      }
+    });
 
     const handleLogout = async () => {
       try {
-        await axios.post("/api/auth/logout");
-        localStorage.removeItem("token");
+        console.log("SidebarMenu: Attempting to logout via Vuex action...");
+        await store.dispatch("auth/logout");
+        console.log("SidebarMenu: Logout successful. Redirecting to login.");
         router.push("/login");
       } catch (error) {
-        console.error("Logout error:", error);
+        console.error("SidebarMenu: Logout error:", error);
+        router.push("/login"); // Ensure redirection happens regardless of backend error
       }
     };
 
@@ -136,12 +153,14 @@ export default {
       currentRoute,
       toggleSidebar,
       handleLogout,
+      // No need to expose userRole directly, menuItems computed property uses isAdmin
     };
   },
 };
 </script>
 
 <style scoped>
+/* Your existing styles (copy-pasted from your prompt) */
 .sidebar {
   width: 240px;
   height: 100vh;

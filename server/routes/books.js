@@ -1,3 +1,4 @@
+// backend/routes/book.js
 const express = require("express");
 const bookController = require("../controllers/books");
 const authMiddleware = require("../middlewares/auth");
@@ -10,6 +11,9 @@ router.get("/", bookController.getAllBooks);
 router.get("/search", bookController.searchBooks);
 router.get("/:id", bookController.getBookById);
 
+// NEW: Public routes for general popular and trending books
+router.get("/popular", bookController.getPopularBooks);
+router.get("/trending", bookController.getTrendingBooks);
 // Admin-only routes (for managing books)
 router.post("/", authMiddleware, adminMiddleware, bookController.createBook);
 router.put("/:id", authMiddleware, adminMiddleware, bookController.updateBook);

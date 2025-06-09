@@ -8,7 +8,7 @@ const createOrder = async (orderData) => {
       ...orderData,
       createdAt: new Date(),
       updatedAt: new Date(),
-      status: orderData.status || "pending", // Default status
+      status: orderData.status || "pending", // Default status is correctly set to 'status'
     };
     await orderRef.set(newOrder);
     return { id: orderRef.id, ...newOrder };
@@ -60,7 +60,7 @@ const updateOrderStatus = async (orderId, newStatus) => {
   try {
     const orderRef = db.collection("orders").doc(orderId);
     await orderRef.update({
-      status: newStatus,
+      status: newStatus, // Correctly updates the 'status' field
       updatedAt: new Date(),
     });
     const updatedDoc = await orderRef.get();

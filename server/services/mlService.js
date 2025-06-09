@@ -2,11 +2,13 @@
 const { db } = require("../firebase/firebase");
 const { getCache, setCache, deleteCache } = require("../utils/cache");
 
+// Cache TTLs (Time To Live) in milliseconds
 const USER_RATINGS_CACHE_TTL = 1 * 60 * 60 * 1000; // 1 hour
 const ALL_RATINGS_CACHE_TTL = 1 * 60 * 60 * 1000; // 1 hour
 const SIMILAR_USERS_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
 const SIMILAR_BOOKS_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
 const RECOMMENDATIONS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes (personal recommendations might change faster)
+const ALL_BOOKS_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours for all books data (used by getPopularBooks if applicable)
 
 // --- Helper Functions to Fetch Ratings (with Caching) ---
 
@@ -74,7 +76,6 @@ const getAllBooksRatingsMap = async () => {
 
 // Cosine Similarity between two rating vectors
 const calculateCosineSimilarity = (vec1, vec2) => {
-  // MODIFIED: Use Object.keys for safer iteration
   const commonKeys = Object.keys(vec1).filter((key) =>
     Object.prototype.hasOwnProperty.call(vec2, key)
   );
@@ -91,11 +92,9 @@ const calculateCosineSimilarity = (vec1, vec2) => {
     dotProduct += vec1[key] * vec2[key];
   }
 
-  // MODIFIED: Use Object.keys for safer iteration
   for (const key of Object.keys(vec1)) {
     magnitude1 += vec1[key] ** 2;
   }
-  // MODIFIED: Use Object.keys for safer iteration
   for (const key of Object.keys(vec2)) {
     magnitude2 += vec2[key] ** 2;
   }
@@ -128,7 +127,6 @@ const findSimilarUsers = async (targetUserId, topN = 5) => {
   const allUsersRatings = await getAllUsersRatingsMap();
   const similarities = [];
 
-  // MODIFIED: Use Object.keys for safer iteration
   for (const userId of Object.keys(allUsersRatings)) {
     if (userId === targetUserId) continue;
 
@@ -151,7 +149,7 @@ const getUserBasedRecommendations = async (
   targetUserId,
   numRecommendations = 5
 ) => {
-  const cacheKey = `user_based_recommendations_${targetUserId}`;
+  const cacheKey = `user_based_recommendations_${targetUserId}_${numRecommendations}`; // Include num in cache key
   let cachedRecs = getCache(cacheKey);
   if (cachedRecs) {
     return cachedRecs;
@@ -168,9 +166,7 @@ const getUserBasedRecommendations = async (
 
   for (const { userId: similarUserId, similarity } of similarUsers) {
     const similarUserRatings = await getUserRatingsMap(similarUserId);
-    // MODIFIED: Use Object.keys for safer iteration
     for (const bookId of Object.keys(similarUserRatings)) {
-      // MODIFIED: Check if targetUserRatings has the bookId
       if (!Object.prototype.hasOwnProperty.call(targetUserRatings, bookId)) {
         if (!recommendedBookScores[bookId]) {
           recommendedBookScores[bookId] = 0;
@@ -200,7 +196,7 @@ const getUserBasedRecommendations = async (
 // --- Item-Based Collaborative Filtering ---
 
 const findSimilarBooks = async (targetBookId, topN = 5) => {
-  const cacheKey = `similar_books_${targetBookId}`;
+  const cacheKey = `similar_books_${targetBookId}_${topN}`; // Include topN in cache key
   let similarBooks = getCache(cacheKey);
   if (similarBooks) {
     return similarBooks;
@@ -215,7 +211,6 @@ const findSimilarBooks = async (targetBookId, topN = 5) => {
   }
 
   const similarities = [];
-  // MODIFIED: Use Object.keys for safer iteration
   for (const bookId of Object.keys(allBooksRatings)) {
     if (bookId === targetBookId) continue;
 
@@ -238,7 +233,7 @@ const getItemBasedRecommendations = async (
   targetUserId,
   numRecommendations = 5
 ) => {
-  const cacheKey = `item_based_recommendations_${targetUserId}`;
+  const cacheKey = `item_based_recommendations_${targetUserId}_${numRecommendations}`; // Include num in cache key
   let cachedRecs = getCache(cacheKey);
   if (cachedRecs) {
     return cachedRecs;
@@ -251,17 +246,12 @@ const getItemBasedRecommendations = async (
   }
 
   const recommendedBookScores = {};
-  // const allBooksRatings = await getAllBooksRatingsMap(); // Not directly used here, but useful for other parts
 
-  // For each book the user has rated
-  // MODIFIED: Use Object.keys for safer iteration
   for (const ratedBookId of Object.keys(userRatings)) {
     const userRatingForBook = userRatings[ratedBookId];
-    const similarBooks = await findSimilarBooks(ratedBookId, 5);
+    const similarBooks = await findSimilarBooks(ratedBookId, 5); // Fetch a few similar books
 
     for (const { bookId: similarBookId, similarity } of similarBooks) {
-      // Only consider books the user hasn't rated yet
-      // MODIFIED: Check if userRatings has the similarBookId
       if (!Object.prototype.hasOwnProperty.call(userRatings, similarBookId)) {
         if (!recommendedBookScores[similarBookId]) {
           recommendedBookScores[similarBookId] = 0;
@@ -290,47 +280,51 @@ const getItemBasedRecommendations = async (
 // --- Other potential algorithms (Conceptual/Future) ---
 
 const getPopularBooks = async (num = 5) => {
-  // Caching for popular books (less frequent change)
   const cacheKey = `popular_books_${num}`;
   let popularBooks = getCache(cacheKey);
   if (popularBooks) {
     return popularBooks;
   }
 
+  // Assuming 'averageRating' and 'numRatings' fields exist on books
   const snapshot = await db
     .collection("books")
-    .orderBy("numRatings", "desc")
+    .orderBy("numRatings", "desc") // Or based on averageRating, or a combination
     .limit(num)
     .get();
   popularBooks = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  setCache(cacheKey, popularBooks, ALL_BOOKS_CACHE_TTL); // You might want a longer TTL for general book data
+  setCache(cacheKey, popularBooks, ALL_BOOKS_CACHE_TTL);
   return popularBooks;
 };
 
-// Example for Trending (more complex, involves time-based recent activity)
 const getTrendingBooks = async (num = 5) => {
-  // This would require more sophisticated tracking of recent interactions (views, purchases, new ratings)
-  // For now, let's just return recently added highly-rated books as a placeholder
   const cacheKey = `trending_books_${num}`;
   let trendingBooks = getCache(cacheKey);
   if (trendingBooks) {
     return trendingBooks;
   }
 
+  // This is a placeholder for trending. A true trending algorithm would involve:
+  // - Tracking recent views, purchases, or new ratings.
+  // - Weighting recent activity higher.
+  // For this example, we'll sort recently added books by their average rating.
   const snapshot = await db
     .collection("books")
-    .orderBy("createdAt", "desc")
-    .limit(num)
+    .orderBy("createdAt", "desc") // Assuming a 'createdAt' timestamp field
+    .limit(num * 2) // Fetch a few more to filter/sort
     .get();
+
   trendingBooks = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  trendingBooks.sort((a, b) => b.averageRating - a.averageRating); // Prioritize higher rated recent books
-  trendingBooks = trendingBooks.slice(0, num);
-  setCache(cacheKey, trendingBooks, RECOMMENDATIONS_CACHE_TTL); // Trending changes faster
+
+  // Refine trending: filter out books with no ratings, sort by averageRating
+  trendingBooks = trendingBooks
+    .filter((book) => book.averageRating > 0) // Only show rated books as trending
+    .sort((a, b) => b.averageRating - a.averageRating)
+    .slice(0, num); // Take the top 'num' after sorting
+
+  setCache(cacheKey, trendingBooks, RECOMMENDATIONS_CACHE_TTL); // Trending changes faster, so a shorter TTL
   return trendingBooks;
 };
-
-// New TTL for all books data (used by getPopularBooks if you include it there)
-const ALL_BOOKS_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours for all books data
 
 module.exports = {
   getUserBasedRecommendations,

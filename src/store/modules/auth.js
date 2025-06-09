@@ -1,8 +1,16 @@
 import axios from "axios";
+import { auth } from "@/firebase"; // Make sure this path is correct for your Firebase client setup
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile, // Import updateProfile
+} from "firebase/auth";
 
 const state = {
+  // Initialize user from localStorage or null. Role should be part of this user object.
   user: JSON.parse(localStorage.getItem("user")) || null,
   token: localStorage.getItem("token") || null,
+  // isAuthenticated should be derived from token presence
   isAuthenticated: !!localStorage.getItem("token"),
   error: null,
   loading: false,
@@ -22,72 +30,243 @@ const mutations = {
   },
   SET_TOKEN(state, token) {
     state.token = token;
-    state.isAuthenticated = !!token;
+    state.isAuthenticated = !!token; // Update isAuthenticated based on token presence
+    console.log(
+      "SET_TOKEN: Token received:",
+      token ? "YES" : "NO",
+      "Length:",
+      token ? token.length : 0
+    );
     if (token) {
       localStorage.setItem("token", token);
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      console.log(
+        "SET_TOKEN: Axios Authorization header set to:",
+        axios.defaults.headers.common["Authorization"]
+      );
     } else {
       localStorage.removeItem("token");
       delete axios.defaults.headers.common["Authorization"];
+      console.log("SET_TOKEN: Axios Authorization header cleared.");
     }
   },
   SET_ERROR(state, error) {
     state.error = error;
   },
+  CLEAR_AUTH_STATE(state) {
+    state.user = null;
+    state.token = null;
+    state.isAuthenticated = false;
+    state.error = null;
+    state.loading = false;
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    delete axios.defaults.headers.common["Authorization"];
+    console.log("CLEAR_AUTH_STATE: Auth state cleared.");
+  },
 };
 
 const actions = {
-  async register({ commit }, userData) {
+  async register({ commit }, { firstName, lastName, email, password }) {
     commit("SET_LOADING", true);
+    commit("SET_ERROR", null);
     try {
-      const response = await axios.post("/api/auth/register", userData);
-      console.log("Registration response:", response.data);
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const firebaseUser = userCredential.user;
+
+      // Update Firebase user's profile with first/last name
+      // This is on the Firebase Auth user object, not Firestore
+      await updateProfile(firebaseUser, {
+        displayName: `${firstName} ${lastName}`,
+      });
+      console.log(
+        "FRONTEND (Vuex Register): Firebase Auth user created and profile updated."
+      );
+
+      const idToken = await firebaseUser.getIdToken();
+      console.log(
+        "FRONTEND (Vuex Register): Newly acquired Firebase ID Token for backend registration:",
+        idToken
+      );
+
+      // Send Firebase ID Token to your backend's register endpoint
+      // The backend will create the Firestore profile and issue your custom JWT
+      const response = await axios.post("/api/auth/register", {
+        email: email,
+        firstName: firstName,
+        lastName: lastName,
+        // No need to send idToken here if backend handles it upon creation from firebaseUser.uid
+        // or if it expects a separate login post-registration for token exchange.
+        // Based on your backend, you were sending idToken from Firebase login to backend /api/auth/login.
+        // For /api/auth/register, the backend directly calls admin.auth().createUser.
+        // So, idToken is likely not needed for *this specific backend register endpoint*.
+        // If your backend /api/auth/register route *does* expect it, then re-add idToken: idToken,
+        // But the previous backend controller didn't use it for register.
+      });
+
+      // Commit state changes with the custom JWT and user data from backend
+      commit("SET_USER", response.data.user); // Backend response should include user object with role
+      commit("SET_TOKEN", response.data.token);
+
       return response.data;
     } catch (error) {
-      console.error("Registration error:", error.response?.data);
-      throw error;
+      console.error("Vuex Register Error:", error);
+      let errorMessage = "Registration failed. An unexpected error occurred.";
+      if (error.code) {
+        switch (error.code) {
+          case "auth/email-already-in-use":
+            errorMessage = "Email is already registered.";
+            break;
+          case "auth/invalid-email":
+            errorMessage = "Please enter a valid email address.";
+            break;
+          case "auth/weak-password":
+            errorMessage = "Password is too weak (min 6 characters).";
+            break;
+          default:
+            errorMessage = `Registration failed. (${error.code})`;
+        }
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      commit("SET_ERROR", errorMessage);
+      throw new Error(errorMessage);
     } finally {
       commit("SET_LOADING", false);
     }
   },
 
-  async login({ commit }, credentials) {
+  async login({ commit }, { email, password }) {
     commit("SET_LOADING", true);
+    commit("SET_ERROR", null);
     try {
-      const response = await axios.post("/api/auth/login", credentials);
-      commit("SET_USER", response.data.user);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const firebaseUser = userCredential.user;
+
+      const idToken = await firebaseUser.getIdToken();
+      console.log(
+        "FRONTEND (Vuex Login): Newly acquired Firebase ID Token for backend login:",
+        idToken
+      );
+
+      // Send Firebase ID Token to your backend for custom JWT exchange
+      const response = await axios.post("/api/auth/login", {
+        idToken: idToken,
+      });
+
+      // Commit state changes with the custom JWT and user data from backend
+      commit("SET_USER", response.data.user); // Backend response should include user object with role
       commit("SET_TOKEN", response.data.token);
+
       return response.data;
     } catch (error) {
-      commit("SET_ERROR", error.response?.data?.error || "Login failed");
-      throw error;
+      console.error("Vuex Login Error:", error);
+      let errorMessage = "Login failed. An unexpected error occurred.";
+      if (error.code) {
+        switch (error.code) {
+          case "auth/user-not-found":
+          case "auth/wrong-password":
+            errorMessage = "Invalid email or password.";
+            break;
+          case "auth/invalid-email":
+            errorMessage = "Please enter a valid email address.";
+            break;
+          case "auth/user-disabled":
+            errorMessage = "This account has been disabled.";
+            break;
+          default:
+            errorMessage = `Authentication failed. (${error.code})`;
+        }
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      }
+      commit("SET_ERROR", errorMessage);
+      throw new Error(errorMessage);
     } finally {
       commit("SET_LOADING", false);
     }
   },
 
   async logout({ commit }) {
+    commit("SET_LOADING", true);
     try {
-      await axios.post("/api/auth/logout");
-      commit("SET_USER", null);
-      commit("SET_TOKEN", null);
+      await auth.signOut(); // Sign out from Firebase client-side
+      await axios.post("/api/auth/logout"); // Inform backend (optional, for session invalidation)
+      commit("CLEAR_AUTH_STATE"); // Clear all auth related state
     } catch (error) {
-      console.error("Logout error:", error);
-      // Still clear user data even if logout request fails
-      commit("SET_USER", null);
-      commit("SET_TOKEN", null);
+      console.error("Vuex Logout Error:", error);
+      commit("CLEAR_AUTH_STATE"); // Always clear local state even if backend fails
       throw error;
+    } finally {
+      commit("SET_LOADING", false);
     }
   },
 
-  // Simplified verification actions
-  async resendVerification(_, email) {
-    return await axios.post("/api/auth/verify/resend", { email });
+  initializeAuth({ commit }) {
+    const token = localStorage.getItem("token");
+    const user = localStorage.getItem("user");
+    console.log("initializeAuth: Checking localStorage for token...");
+    if (token && user) {
+      try {
+        const parsedUser = JSON.parse(user);
+        // Set token first, which also sets the Axios header
+        commit("SET_TOKEN", token);
+        // Then set the user object
+        commit("SET_USER", parsedUser);
+        console.log("initializeAuth: Token and user found and re-initialized.");
+      } catch (e) {
+        console.error("Error parsing user from localStorage:", e);
+        commit("CLEAR_AUTH_STATE"); // Clear if localStorage data is corrupt
+      }
+    } else {
+      console.log(
+        "initializeAuth: No token or user found in localStorage. Clearing auth state."
+      );
+      commit("CLEAR_AUTH_STATE"); // Clear if state is incomplete or missing
+    }
   },
 
-  // Simple status check without unnecessary wrapper
-  async checkVerificationStatus(_, email) {
-    return await axios.get(`/api/auth/verify/check?email=${email}`);
+  async fetchUserProfile({ commit, state }) {
+    if (!state.token) {
+      console.warn(
+        "fetchUserProfile: No token available in state. Cannot fetch profile."
+      );
+      // This throw will be caught by the router guard, which should then initiate a logout.
+      throw new Error("No authentication token found.");
+    }
+
+    try {
+      // Axios will automatically add the 'Authorization' header because it was set by SET_TOKEN.
+      const response = await axios.get("/api/auth/profile");
+      const userProfile = response.data.user; // Assuming backend sends { user: profileData }
+
+      // Update the user state with the fetched profile data (e.g., to ensure role is current)
+      commit("SET_USER", userProfile);
+
+      console.log(
+        "fetchUserProfile: User profile fetched successfully:",
+        userProfile
+      );
+      return userProfile; // Return the user object (including role) for the router guard to use
+    } catch (error) {
+      console.error("Vuex: Failed to fetch user profile:", error);
+      // If the error is 401, it suggests the token is invalid/expired.
+      if (error.response && error.response.status === 401) {
+        console.warn(
+          "fetchUserProfile: Token invalid or expired (401 response). Clearing auth state."
+        );
+        commit("CLEAR_AUTH_STATE"); // Clear local state to force re-authentication
+      }
+      throw error; // Re-throw to propagate the error to the router guard's catch block
+    }
   },
 };
 
@@ -96,6 +275,8 @@ const getters = {
   currentUser: (state) => state.user,
   authError: (state) => state.error,
   isLoading: (state) => state.loading,
+  // Add this crucial getter for role-based access
+  isAdmin: (state) => state.user && state.user.role === "admin",
 };
 
 export default {

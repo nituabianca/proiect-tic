@@ -73,7 +73,7 @@
 /* eslint-disable */
 import { ref } from "vue";
 import { useRouter } from "vue-router";
-import { useStore } from "vuex";
+import { useStore } from "vuex"; // Make sure to import useStore
 
 export default {
   name: "RegisterPage",
@@ -85,9 +85,9 @@ export default {
     const confirmPassword = ref("");
     const errorMessage = ref("");
     const successMessage = ref("");
-    const loading = ref(false);
+    const loading = ref(false); // Make sure loading is defined
     const router = useRouter();
-    const store = useStore();
+    const store = useStore(); // Initialize useStore
 
     const validateForm = () => {
       if (password.value !== confirmPassword.value) {
@@ -122,8 +122,9 @@ export default {
           router.push("/login");
         }, 2000);
       } catch (error) {
+        // Error handling from Vuex action
         errorMessage.value =
-          error.response?.data?.error || "Registration failed";
+          store.getters["auth/authError"] || "Registration failed";
         console.error("Registration error:", error);
       } finally {
         loading.value = false;
@@ -146,6 +147,7 @@ export default {
 </script>
 
 <style scoped>
+/* Your existing styles */
 .register-container {
   display: flex;
   justify-content: center;
@@ -153,7 +155,6 @@ export default {
   min-height: 100vh;
   padding: 1rem;
 }
-
 .auth-form {
   background-color: white;
   padding: 2rem;
@@ -162,17 +163,14 @@ export default {
   width: 100%;
   max-width: 400px;
 }
-
 .form-group {
   margin-bottom: 1.5rem;
 }
-
 .form-group label {
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
 }
-
 .form-group input {
   width: 100%;
   padding: 0.75rem;
@@ -181,13 +179,11 @@ export default {
   font-size: 1rem;
   transition: border-color 0.3s ease;
 }
-
 .form-group input:focus {
   outline: none;
   border-color: #4caf50;
   box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
 }
-
 .auth-button {
   width: 100%;
   padding: 0.75rem;
@@ -200,32 +196,26 @@ export default {
   font-weight: 500;
   transition: background-color 0.3s ease;
 }
-
 .auth-button:hover:not(:disabled) {
   background-color: #45a049;
 }
-
 .auth-button:disabled {
   background-color: #ccc;
   cursor: not-allowed;
 }
-
 .auth-link {
   text-align: center;
   margin-top: 1.5rem;
   color: #666;
 }
-
 .auth-link a {
   color: #4caf50;
   text-decoration: none;
   font-weight: 500;
 }
-
 .auth-link a:hover {
   text-decoration: underline;
 }
-
 .error-message {
   color: #dc3545;
   text-align: center;
@@ -234,7 +224,6 @@ export default {
   border-radius: 4px;
   background-color: rgba(220, 53, 69, 0.1);
 }
-
 .success-message {
   color: #28a745;
   text-align: center;

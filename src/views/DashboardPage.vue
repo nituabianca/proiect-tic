@@ -98,8 +98,8 @@
           >
             <div class="order-header">
               <span class="order-details">Order #{{ order.id }}</span>
-              <span class="order-status" :class="order.orderStatus">
-                {{ order.orderStatus }}
+              <span class="order-status" :class="order.status">
+                {{ order.status }}
               </span>
             </div>
             <div class="order-info">
@@ -112,7 +112,7 @@
               </div>
             </div>
             <select
-              v-model="order.orderStatus"
+              v-model="order.status"
               @change="updateOrderStatus(order.id, $event.target.value)"
               class="status-select"
             >
@@ -141,8 +141,11 @@ import {
   faSpinner,
   faDollarSign,
   faShoppingBag,
-  faBook,
+  faBookOpen,
   faShoppingCart,
+  faUserCircle,
+  faArrowRight,
+  faExternalLinkAlt,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
@@ -151,8 +154,11 @@ library.add(
   faSpinner,
   faDollarSign,
   faShoppingBag,
-  faBook,
-  faShoppingCart
+  faBookOpen,
+  faShoppingCart,
+  faUserCircle,
+  faArrowRight,
+  faExternalLinkAlt
 );
 
 export default {
@@ -164,21 +170,22 @@ export default {
     const recentOrders = ref([]);
 
     const getPendingOrdersCount = computed(() => {
-      return recentOrders.value.filter(
-        (order) => order.orderStatus === "pending"
-      ).length;
+      return recentOrders.value.filter((order) => order.status === "pending")
+        .length;
     });
 
     const getProcessingOrdersCount = computed(() => {
-      return recentOrders.value.filter(
-        (order) => order.orderStatus === "processing"
-      ).length;
+      return recentOrders.value.filter((order) => order.status === "processing")
+        .length;
     });
 
     const calculateTotalRevenue = computed(() => {
       return recentOrders.value.reduce((total, order) => {
-        const orderTotal = calculateOrderTotal(order);
-        return !isNaN(orderTotal) ? total + orderTotal : total;
+        if (order.status === "shipped" || order.status === "delivered") {
+          const orderTotal = calculateOrderTotal(order);
+          return !isNaN(orderTotal) ? total + orderTotal : total;
+        }
+        return total;
       }, 0);
     });
 
@@ -193,12 +200,16 @@ export default {
     const fetchProfile = async () => {
       try {
         const response = await axios.get("/api/auth/profile");
-        user.value = response.data;
-        if (user.value.role !== "admin") {
+        user.value = response.data.user;
+        console.log("DashboardPage: Fetched user profile:", user.value);
+        if (!user.value || user.value.role !== "admin") {
+          console.warn(
+            "DashboardPage: User is not admin, redirecting to /books."
+          );
           router.push("/books");
         }
       } catch (error) {
-        console.error("Error fetching profile:", error);
+        console.error("Error fetching profile on DashboardPage:", error);
         router.push("/login");
       }
     };
@@ -207,6 +218,9 @@ export default {
       try {
         const response = await axios.get("/api/orders");
         recentOrders.value = response.data;
+        recentOrders.value.sort(
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        );
       } catch (error) {
         console.error("Error fetching orders:", error);
       }
@@ -215,18 +229,26 @@ export default {
     const updateOrderStatus = async (orderId, status) => {
       try {
         await axios.patch(`/api/orders/${orderId}/status`, { status });
-        await fetchRecentOrders();
+        await fetchRecentOrders(); // Re-fetch orders to update the local state and UI
+        console.log(`Order ${orderId} status updated to ${status}`);
       } catch (error) {
         console.error("Error updating order status:", error);
+        alert("Failed to update order status. Please try again.");
       }
     };
 
     const formatDate = (timestamp) => {
       if (!timestamp) return "Invalid Date";
-      return new Date(timestamp).toLocaleDateString("en-US", {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) {
+        return "Invalid Date";
+      }
+      return date.toLocaleDateString("en-US", {
         year: "numeric",
         month: "short",
         day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
       });
     };
 
@@ -244,6 +266,7 @@ export default {
       getProcessingOrdersCount,
       calculateTotalRevenue,
       calculateOrderTotal,
+      router,
     };
   },
 };
@@ -311,14 +334,17 @@ export default {
   background: #fff3cd;
   color: #856404;
 }
+
 .stat-icon.processing {
   background: #cce5ff;
   color: #004085;
 }
+
 .stat-icon.total {
   background: #d4edda;
   color: #155724;
 }
+
 .stat-icon.orders {
   background: #f8d7da;
   color: #721c24;

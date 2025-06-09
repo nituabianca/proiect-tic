@@ -38,9 +38,7 @@ export default {
     const isSidebarCollapsed = ref(false);
 
     watch(route, (newRoute) => {
-      showSidebar.value = !["/login", "/register", "/verify-email"].includes(
-        newRoute.path
-      );
+      showSidebar.value = !["/login", "/register"].includes(newRoute.path);
     });
 
     const handleSidebarToggle = (collapsed) => {

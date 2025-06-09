@@ -145,12 +145,24 @@
 </template>
 
 <script>
-/* eslint-disable */
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue"; // Added 'watch' for better reactivity handling
+import { library } from "@fortawesome/fontawesome-svg-core";
+import {
+  faTimes, // For the close button
+  faSave, // For save button
+  faTimesCircle, // For close button in view mode
+  faBan, // For cancel button
+  faBookOpen, // Added for completeness, might be useful elsewhere
+  faShoppingCart, // Added for completeness
+} from "@fortawesome/free-solid-svg-icons";
+// import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+
+// Add all relevant icons to the library
+library.add(faTimes, faSave, faTimesCircle, faBan, faBookOpen, faShoppingCart);
 
 export default {
   name: "BookModal",
-  components: {},
+  // components: { FontAwesomeIcon },
   props: {
     book: {
       type: Object,
@@ -158,20 +170,54 @@ export default {
     },
     mode: {
       type: String,
-      default: "add",
+      default: "add", // 'add', 'edit', 'view'
+      validator: (value) => ["add", "edit", "view"].includes(value), // Add validator for mode prop
     },
   },
   emits: ["close", "save"],
   setup(props, { emit }) {
-    const formData = ref(
-      props.book
+    // Reactive form data initialized with defaults or prop.book data
+    const formData = ref(initializeFormData(props.book));
+
+    // Watch for changes in the 'book' prop to re-initialize formData
+    // This is crucial for when the same modal component is reused
+    // for different books (e.g., editing one after another without
+    // the component unmounting).
+    watch(
+      () => props.book,
+      (newBook) => {
+        formData.value = initializeFormData(newBook);
+      },
+      { deep: true } // Deep watch for nested object changes if needed
+    );
+
+    /**
+     * Initializes the formData ref based on the provided book object.
+     * Ensures consistent structure and proper date formatting.
+     * @param {Object|null} book - The book object to pre-fill the form.
+     * @returns {Object} The initialized form data.
+     */
+    function initializeFormData(book) {
+      return book
         ? {
-            ...props.book,
-            publicationDate: props.book.publicationDate
-              ? props.book.publicationDate.split("T")[0] // Extract "YYYY-MM-DD"
+            ...book,
+            // Ensure publicationDate is in "YYYY-MM-DD" format for date input
+            publicationDate: book.publicationDate
+              ? new Date(book.publicationDate).toISOString().split("T")[0] // Robust date parsing
               : "",
+            // Ensure nested objects exist, even if book data is incomplete
+            category: book.category || {
+              genre: "Fiction",
+              format: "Paperback",
+            },
+            stock: book.stock || { quantity: 0, warehouse: "" },
+            descriptiveAtributes: book.descriptiveAtributes || {
+              series: "",
+              numberOfPages: 0,
+            },
           }
         : {
+            // Default values for adding a new book
             title: "",
             author: "",
             publisher: "",
@@ -190,9 +236,10 @@ export default {
               series: "",
               numberOfPages: 0,
             },
-          }
-    );
+          };
+    }
 
+    // Computed property for modal title based on mode
     const modalTitle = computed(() => {
       switch (props.mode) {
         case "add":
@@ -202,13 +249,34 @@ export default {
         case "view":
           return "Book Details";
         default:
-          return "";
+          return "Book Information"; // Fallback title
       }
     });
 
+    // Computed property to check if the modal is in view mode
     const isViewMode = computed(() => props.mode === "view");
 
+    /**
+     * Handles the form submission.
+     * Performs basic client-side validation and emits the save event.
+     */
     const handleSubmit = () => {
+      // Basic client-side validation example
+      if (!formData.value.title.trim()) {
+        alert("Book title is required!");
+        return;
+      }
+      if (formData.value.price <= 0) {
+        alert("Price must be greater than zero!");
+        return;
+      }
+      if (formData.value.stock.quantity < 0) {
+        alert("Stock quantity cannot be negative!");
+        return;
+      }
+      // You can add more complex validation logic here
+
+      // Emit a copy of the form data to avoid direct mutation
       emit("save", { ...formData.value });
     };
 
