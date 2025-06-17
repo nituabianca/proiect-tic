@@ -1,39 +1,34 @@
 const express = require("express");
 const orderController = require("../controllers/orders");
-const authMiddleware = require("../middlewares/auth");
-const adminMiddleware = require("../middlewares/admin");
-const userMiddleware = require("../middlewares/user"); // Correct import path
+const { verifyToken, isAdmin, isOrderOwnerOrAdmin } = require("../middleware/auth");
 
 const router = express.Router();
 
-// Authenticated user can create an order
-router.post("/", authMiddleware, orderController.createOrder); // Correctly protected by authMiddleware
+// --- AUTHENTICATED USER ROUTES ---
 
-// Authenticated user can view their own orders
-router.get("/my-orders", authMiddleware, orderController.getUserOrders); // Correctly protected by authMiddleware
+// Create a new order
+router.post("/", verifyToken, orderController.createOrder);
 
-// Admin-only routes
-router.get("/", authMiddleware, adminMiddleware, orderController.getAllOrders); // Correct
-router.get(
-  "/:id",
-  authMiddleware,
-  adminMiddleware,
-  orderController.getOrderById
-); // Correct
-router.put(
-  "/:id/status",
-  authMiddleware,
-  adminMiddleware,
-  orderController.updateOrderStatus
-); // Correct
-router.delete(
-  "/:id",
-  authMiddleware,
-  adminMiddleware,
-  orderController.deleteOrder
-); // Correct
+// Get the logged-in user's own orders
+router.get("/my-orders", verifyToken, orderController.getMyOrders);
 
-// For an admin to see orders of a specific user (if you have this scenario)
-// router.get('/user/:userId', authMiddleware, adminMiddleware, orderController.getUserOrders); // (Commented out, but correct usage if enabled)
+// Get a specific order by its ID (if you are the owner or an admin)
+router.get("/:id", [verifyToken, isOrderOwnerOrAdmin], orderController.getOrderById);
+
+
+// --- ADMIN-ONLY ROUTES ---
+
+// Get a list of ALL orders in the system
+router.get("/", [verifyToken, isAdmin], orderController.getAllOrders);
+
+// Get all orders for a specific user by their user ID
+router.get("/user/:userId", [verifyToken, isAdmin], orderController.getUserOrders);
+
+// Update an order's status
+router.put("/:id/status", [verifyToken, isAdmin], orderController.updateOrderStatus);
+
+// Delete an order
+router.delete("/:id", [verifyToken, isAdmin], orderController.deleteOrder);
+
 
 module.exports = router;
