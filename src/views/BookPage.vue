@@ -181,16 +181,19 @@ import axios from "axios";
 export default {
   name: "BooksPage",
   setup() {
+
     const store = useStore();
-    const books = ref([]); // For all books (infinite scroll)
+    const books = ref([]);
+    const loading = ref(false);
+    const hasMore = ref(true); // Will be controlled by the presence of a nextCursor
+    const nextCursorId = ref(null); // <-- NEW: State to hold the cursor for the next page
+
     const popularBooks = ref([]);
     const trendingBooks = ref([]);
     const userRecommendations = ref([]); // For personalized/hybrid recommendations
 
-    const loading = ref(false); // For all books infinite scroll
     const loadingRecommendations = ref(false); // For fetching recommendations
     const page = ref(1);
-    const hasMore = ref(true);
     const booksContainer = ref(null);
 
     const cartItemCount = computed(() => store.getters["cart/itemCount"]);
@@ -201,36 +204,48 @@ export default {
 
     // --- Core Functions for All Books (Infinite Scroll) ---
     const fetchBooks = async () => {
-      if (loading.value || !hasMore.value) return;
-      loading.value = true;
-      try {
-        // Assuming your /api/books supports pagination. Adjust if it returns all books at once.
-        const response = await axios.get(
-          `/api/books?page=${page.value}&limit=10`
-        );
-        const newBooks = response.data;
-        if (newBooks.length === 0) {
-          hasMore.value = false;
-        } else {
-          books.value = [...books.value, ...newBooks];
-          page.value++;
-        }
-      } catch (error) {
-        console.error("Error fetching all books:", error);
-        hasMore.value = false;
-      } finally {
-        loading.value = false;
-      }
-    };
+  // We can still call if loading is true to "reset" the feed, but not if there are no more pages.
+  if (!hasMore.value) return; 
+  loading.value = true;
+  
+  try {
+    let apiUrl = `/api/books?limit=12`;
+    // If we have a cursor from the previous fetch, add it to the query
+    if (nextCursorId.value) {
+      apiUrl += `&nextCursor=${nextCursorId.value}`;
+    }
 
-    const handleScroll = () => {
-      const { scrollTop, clientHeight, scrollHeight } =
-        document.documentElement;
-      if (scrollTop + clientHeight >= scrollHeight - 100 && !loading.value) {
-        fetchBooks();
-      }
-    };
+    const response = await axios.get(apiUrl);
+    const { books: newBooks, nextCursor } = response.data;
 
+    if (newBooks.length > 0) {
+      // Append the new books to our existing list
+      books.value = [...books.value, ...newBooks];
+    }
+    
+    // Update the cursor for the *next* call
+    nextCursorId.value = nextCursor;
+
+    // If the API returns no next cursor, we've reached the end
+    if (!nextCursor) {
+      hasMore.value = false;
+    }
+
+  } catch (error) {
+    console.error("Error fetching all books:", error);
+    hasMore.value = false; // Stop trying on error
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleScroll = () => {
+  const { scrollTop, clientHeight, scrollHeight } = document.documentElement;
+  // Trigger fetch when user is 100px from the bottom
+  if (scrollTop + clientHeight >= scrollHeight - 100 && !loading.value && hasMore.value) {
+    fetchBooks();
+  }
+};
     // --- New Functions for ML Recommendations ---
 
     const fetchPopularBooks = async () => {
@@ -298,21 +313,19 @@ export default {
 
     // --- Lifecycle Hooks ---
     onMounted(() => {
-      // Fetch all books for infinite scroll
-      fetchBooks();
-      // Fetch general recommendation sections
-      fetchPopularBooks();
-      fetchTrendingBooks();
-      // Fetch personalized recommendations (only if authenticated)
-      fetchUserRecommendations();
+  // Initial fetch (without a cursor)
+  fetchBooks(); 
+  
+  fetchPopularBooks();
+  fetchTrendingBooks();
+  fetchUserRecommendations();
 
-      window.addEventListener("scroll", handleScroll);
-    });
+  window.addEventListener("scroll", handleScroll);
+});
 
-    onUnmounted(() => {
-      window.removeEventListener("scroll", handleScroll);
-    });
-
+onUnmounted(() => {
+  window.removeEventListener("scroll", handleScroll);
+});
     // You might want to re-fetch user recommendations if auth state changes
     // (e.g., user logs in after page load)
     // watch(isAuthenticated, (newValue, oldValue) => {
