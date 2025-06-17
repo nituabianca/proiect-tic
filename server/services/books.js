@@ -182,7 +182,7 @@ const updateBookStock = async (id, quantity) => {
       return null; // Book not found
     }
 
-    const currentStock = bookDoc.data().stock || 0;
+    const currentStock = bookDoc.data()?.stock ?? 0;
     const newStock = currentStock + quantity; // `quantity` can be positive (add) or negative (subtract)
 
     if (newStock < 0) {
