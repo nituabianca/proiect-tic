@@ -1,31 +1,26 @@
 // backend/controllers/bookController.js
 const bookService = require("../services/books");
 const mlService = require("../services/mlService"); // NEW: Import mlService
-const { deleteCache } = require("../utils/cache");
 
 const bookController = {
   async getAllBooks(req, res) {
     try {
-      // Assuming pagination params might be sent for /api/books
-      const page = parseInt(req.query.page) || 1;
-      const limit = parseInt(req.query.limit) || 10; // Example limit
-      const books = await bookService.getAllBooks(page, limit); // You might need to update bookService.getAllBooks
-      res.json(books);
+      const books = await bookService.getAllBooks();
+      res.status(200).json(books);
     } catch (error) {
-      console.error("Error getting all books:", error);
       res.status(500).json({ error: error.message });
     }
   },
 
   async getBookById(req, res) {
     try {
-      const book = await bookService.queryBookById(req.params.id);
+      // Calling the consistently named service function
+      const book = await bookService.getBookById(req.params.id);
       if (!book) {
         return res.status(404).json({ error: "Book not found." });
       }
-      res.json(book);
+      res.status(200).json(book);
     } catch (error) {
-      console.error("Error getting book by ID:", error);
       res.status(500).json({ error: error.message });
     }
   },
@@ -33,16 +28,9 @@ const bookController = {
   async createBook(req, res) {
     try {
       const newBook = await bookService.createBook(req.body);
-      // Invalidate caches related to all books and recommendations
-      deleteCache("all_books"); // Cache for getAllBooks
-      deleteCache("all_ratings"); // If a new book could affect future ratings retrieval
-      deleteCache("popular_books_5"); // Invalidate popular books cache (assuming 5 is the default limit)
-
-      res
-        .status(201)
-        .json({ message: "Book created successfully", book: newBook });
+      // No cache logic here! The service handles it.
+      res.status(201).json({ message: "Book created successfully", book: newBook });
     } catch (error) {
-      console.error("Error creating book:", error);
       res.status(500).json({ error: error.message });
     }
   },
@@ -53,14 +41,9 @@ const bookController = {
       if (!updatedBook) {
         return res.status(404).json({ error: "Book not found." });
       }
-      // Invalidate caches related to specific book and all books
-      deleteCache("all_books"); // Cache for getAllBooks
-      deleteCache(`similar_books_${req.params.id}`); // Specific book's similar books
-      deleteCache("popular_books_5"); // Popularity might change
-
-      res.json({ message: "Book updated successfully", book: updatedBook });
+      // No cache logic here!
+      res.status(200).json({ message: "Book updated successfully", book: updatedBook });
     } catch (error) {
-      console.error("Error updating book:", error);
       res.status(500).json({ error: error.message });
     }
   },
@@ -71,15 +54,9 @@ const bookController = {
       if (!success) {
         return res.status(404).json({ error: "Book not found." });
       }
-      // Invalidate caches related to all books, all ratings, and all recommendations
-      deleteCache("all_books");
-      deleteCache("all_ratings");
-      deleteCache("popular_books_5");
-      deleteCache(`similar_books_${req.params.id}`);
-
-      res.json({ message: "Book deleted successfully." });
+      // No cache logic here!
+      res.status(200).json({ message: "Book deleted successfully." });
     } catch (error) {
-      console.error("Error deleting book:", error);
       res.status(500).json({ error: error.message });
     }
   },
