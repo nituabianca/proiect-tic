@@ -222,16 +222,18 @@ export default {
       }
     };
 
-    const updateOrderStatus = async (orderId, status) => {
-      try {
-        await axios.patch(`/api/orders/${orderId}/status`, { status });
-        await fetchRecentOrders(); // Re-fetch orders to update the local state and UI
-        console.log(`Order ${orderId} status updated to ${status}`);
-      } catch (error) {
-        console.error("Error updating order status:", error);
-        alert("Failed to update order status. Please try again.");
-      }
-    };
+const updateOrderStatus = async (orderId, status) => {
+  try {
+    // CORRECTED: The method is PUT, not PATCH. The URL format is also slightly different.
+    await axios.put(`/api/orders/${orderId}/status`, { status }); 
+    await fetchRecentOrders();
+    // Use your toast composable for better UX
+    // showToast(`Order ${orderId} status updated to ${status}`, 'success');
+  } catch (error) {
+    console.error("Error updating order status:", error);
+    // showToast("Failed to update order status.", 'error');
+  }
+};
 
     const formatDate = (timestamp) => {
       if (!timestamp) return "Invalid Date";
