@@ -5,8 +5,20 @@ const mlService = require("../services/mlService"); // NEW: Import mlService
 const bookController = {
   async getAllBooks(req, res) {
     try {
-      const books = await bookService.getAllBooks();
-      res.status(200).json(books);
+      const { limit, nextCursor, search, genre } = req.query;
+      
+      // Assemble filter object for the service
+      const filters = {};
+      if (search) filters.search = search;
+      if (genre) filters.genre = genre;
+      
+      const result = await bookService.getBooks({
+        limit: parseInt(limit) || 12,
+        startAfterId: nextCursor || null,
+        filters,
+      });
+      
+      res.status(200).json(result);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
