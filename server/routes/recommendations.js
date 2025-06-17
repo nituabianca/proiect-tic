@@ -1,11 +1,10 @@
-// backend/routes/recommendation.js
 const express = require("express");
-const recommendationsController = require("../controllers/recommendations"); // Corrected name
-const authMiddleware = require("../middlewares/auth"); // Assuming this path is correct
+const recommendationsController = require("../controllers/recommendationsController");
+const { verifyToken } = require("../middleware/auth.middleware");
 
 const router = express.Router();
 
-// This route serves the personalized/hybrid recommendations for the authenticated user.
-router.get("/", authMiddleware, recommendationsController.getRecommendations);
+// A logged-in user gets their own personalized list of recommendations.
+router.get("/", verifyToken, recommendationsController.getRecommendations);
 
 module.exports = router;
