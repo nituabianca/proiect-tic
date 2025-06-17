@@ -16,5 +16,6 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore(); // Get Firestore instance (after initialization)
+const auth = admin.auth();
 
-module.exports = { admin, db }; // Export both admin and db for use in other files
+module.exports = { admin, db , auth}; // Export both admin and db for use in other files

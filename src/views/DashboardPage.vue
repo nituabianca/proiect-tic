@@ -131,7 +131,6 @@
 </template>
 
 <script>
-/* eslint-disable */
 import { ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import axios from "axios";
@@ -181,11 +180,8 @@ export default {
 
     const calculateTotalRevenue = computed(() => {
       return recentOrders.value.reduce((total, order) => {
-        if (order.status === "shipped" || order.status === "delivered") {
-          const orderTotal = calculateOrderTotal(order);
-          return !isNaN(orderTotal) ? total + orderTotal : total;
-        }
-        return total;
+        const orderTotal = calculateOrderTotal(order);
+        return !isNaN(orderTotal) ? total + orderTotal : total;
       }, 0);
     });
 

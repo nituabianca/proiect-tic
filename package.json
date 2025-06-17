@@ -25,6 +25,7 @@
     "firebase": "^11.2.0",
     "firebase-admin": "^13.0.2",
     "fix": "^0.0.6",
+    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.474.0",
     "vue": "^3.2.13",
     "vue-router": "^4.5.0",
@@ -49,8 +50,7 @@
     "env": {
       "node": true
     },
-    "extends": [
-    ],
+    "extends": [],
     "parserOptions": {
       "parser": "@babel/eslint-parser"
     },
