@@ -70,38 +70,32 @@ const actions = {
     commit("UPDATE_QUANTITY", payload);
   },
 
-  async checkout({ commit, state }) {
+async checkout({ commit, state }) {
     commit("SET_LOADING", true);
     try {
+      // The backend expects this specific, lean format.
       const orderData = {
-        items: state.items.map((item) => ({
-          id: item.id,
-          title: item.title,
-          price: item.price,
+        items: state.items.map(item => ({
+          bookId: item.id,
           quantity: item.quantity,
-          author: item.author,
-          cover: item.cover,
+          priceAtPurchase: item.price // The price when the order was placed
         })),
-        total: state.items.reduce(
-          (sum, item) => sum + item.price * item.quantity,
-          0
-        ),
-        orderStatus: "pending",
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        // The totalAmount will be calculated on the backend for security and accuracy,
+        // but we can send our calculation for reference if needed.
+        // Let's rely on the backend calculation.
       };
 
       const response = await axios.post("/api/orders", orderData);
+      
       commit("CLEAR_CART");
       return response.data;
     } catch (error) {
-      commit("SET_ERROR", error.message);
+      commit("SET_ERROR", error.response?.data?.error || "Checkout failed.");
       throw error;
     } finally {
       commit("SET_LOADING", false);
     }
   },
-};
 
 const getters = {
   cartTotal: (state) =>
