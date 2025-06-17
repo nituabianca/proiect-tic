@@ -50,7 +50,8 @@ import {
   faSignOutAlt,
   faClipboardList,
 } from "@fortawesome/free-solid-svg-icons";
-
+import { faBookReader } from "@fortawesome/free-solid-svg-icons";
+library.add(faBookReader);
 library.add(
   faHome,
   faBook,
@@ -94,11 +95,13 @@ export default {
       { name: "Manage Books", path: "/books/manage", icon: "edit" },
       { name: "Manage Orders", path: "/orders/manage", icon: "clipboard-list" },
       { name: "Cart", path: "/cart", icon: "shopping-cart" },
+      { name: "My Library", path: "/my-library", icon: "book-reader" }, // <-- NEW
       { name: "Profile", path: "/profile", icon: "user" },
     ];
 
     const userMenuItems = [
       { name: "Books", path: "/books", icon: "book" },
+      { name: "My Library", path: "/my-library", icon: "book-reader" }, // <-- NEW
       { name: "Cart", path: "/cart", icon: "shopping-cart" },
       { name: "Profile", path: "/profile", icon: "user" },
     ];

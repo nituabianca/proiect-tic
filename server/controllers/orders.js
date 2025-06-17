@@ -15,8 +15,18 @@ const orderController = {
   // For admins to get all orders
   async getAllOrders(req, res) {
     try {
-      const orders = await orderService.getAllOrders();
-      res.status(200).json(orders);
+      const { limit, nextCursor, status, searchQuery } = req.query;
+      const filters = {};
+      if (status) filters.status = status;
+      if (searchQuery) filters.searchQuery = searchQuery;
+
+      const result = await orderService.getOrders({
+        limit: parseInt(limit) || 15,
+        startAfterId: nextCursor || null,
+        filters,
+      });
+
+      res.status(200).json(result);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
@@ -59,9 +69,7 @@ const orderController = {
     try {
       const { status } = req.body;
       const updatedOrder = await orderService.updateOrderStatus(req.params.id, status);
-      if (!updatedOrder) {
-        return res.status(404).json({ error: "Order not found." });
-      }
+      if (!updatedOrder) return res.status(404).json({ error: "Order not found." });
       res.status(200).json({ message: "Order status updated", order: updatedOrder });
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -71,9 +79,7 @@ const orderController = {
   async deleteOrder(req, res) {
     try {
       const success = await orderService.deleteOrder(req.params.id);
-      if (!success) {
-        return res.status(404).json({ error: "Order not found." });
-      }
+      if(!success) return res.status(404).json({ error: "Order not found." });
       res.status(200).json({ message: "Order deleted successfully." });
     } catch (error) {
       res.status(500).json({ error: error.message });

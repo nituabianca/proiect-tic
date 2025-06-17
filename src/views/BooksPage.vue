@@ -13,9 +13,9 @@
         <h2>📚 Recommendations for You</h2>
         <p>Based on your reading history and preferences:</p>
         <div class="books-carousel">
+          <router-link v-for="book in userRecommendations" :key="book.id" :to="`/books/${book.id}`" class="book-link">
           <div
-            v-for="book in userRecommendations"
-            :key="book.id"
+
             class="book-card-small"
           >
             <img
@@ -35,6 +35,7 @@
               Add
             </button>
           </div>
+          </router-link>
           <div v-if="loadingRecommendations" class="loading-spinner-small">
             Loading...
           </div>
@@ -63,9 +64,8 @@
         <h2>🔥 Popular Books</h2>
         <p>Most loved by our community:</p>
         <div class="books-carousel">
+          <router-link v-for="book in popularBooks" :key="book.id" :to="`/books/${book.id}`" class="book-link">
           <div
-            v-for="book in popularBooks"
-            :key="book.id"
             class="book-card-small"
           >
             <img
@@ -85,6 +85,7 @@
               Add
             </button>
           </div>
+          </router-link>
           <div v-if="loadingRecommendations" class="loading-spinner-small">
             Loading...
           </div>
@@ -101,9 +102,8 @@
         <h2>📈 Trending Books</h2>
         <p>What's hot right now:</p>
         <div class="books-carousel">
+          <router-link v-for="book in trendingBooks" :key="book.id" :to="`/books/${book.id}`" class="book-link">v
           <div
-            v-for="book in trendingBooks"
-            :key="book.id"
             class="book-card-small"
           >
             <img
@@ -123,6 +123,7 @@
               Add
             </button>
           </div>
+          </router-link>
           <div v-if="loadingRecommendations" class="loading-spinner-small">
             Loading...
           </div>
@@ -138,7 +139,8 @@
       <section class="all-books-section">
         <h2>All Books</h2>
         <div class="books-grid" ref="booksContainer">
-          <div v-for="book in books" :key="book.id" class="book-card">
+          <router-link v-for="book in books" :key="book.id" :to="`/books/${book.id}`" class="book-link">
+          <div class="book-card">
             <div class="book-cover-container">
               <img
                 :src="`https://picsum.photos/seed/${book.id}/300/400`"
@@ -169,6 +171,7 @@
               <div class="book-genre">Genre: {{ book.genre }}</div>
             </div>
           </div>
+          </router-link>
         </div>
       </section>
     </div>
@@ -197,6 +200,9 @@ import axios from "axios";
 
 export default {
   name: "BooksPage",
+  components:{
+    StarRating,
+  },
   setup() {
 
     const store = useStore();

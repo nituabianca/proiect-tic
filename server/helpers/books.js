@@ -1,23 +1,11 @@
 // backend/helpers/books.js
 const { faker } = require("@faker-js/faker");
+const { GENRES } = require("../constants/bookData");
 
 const generateMockBook = () => {
   const title = faker.lorem.words({ min: 2, max: 5 });
   const author = faker.person.fullName();
-  const genre = faker.helpers.arrayElement([
-    "Fantasy",
-    "Science Fiction",
-    "Mystery",
-    "Thriller",
-    "Romance",
-    "Horror",
-    "Historical Fiction",
-    "Biography",
-    "Self-Help",
-    "Poetry",
-    "Young Adult",
-    "Children",
-  ]);
+  const genre = faker.helpers.arrayElement(GENRES);
   const publisher = faker.company.name();
   const pages = faker.number.int({ min: 100, max: 1000 });
   const price = parseFloat(faker.commerce.price({ min: 5, max: 50, dec: 2 }));
@@ -30,7 +18,7 @@ const generateMockBook = () => {
   });
 
   return {
-    id: faker.string.uuid(), // This will be overwritten by Firestore doc ID
+    // id: faker.string.uuid(), // This will be overwritten by Firestore doc ID
     title: title,
     author: author,
     description: faker.lorem.paragraph({ min: 3, max: 7 }),

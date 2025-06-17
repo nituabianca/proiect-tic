@@ -8,142 +8,136 @@
     </div>
 
     <form @submit.prevent="handleServerSearch" class="search-form">
-      <input v-model="activeFilters.search" placeholder="Search title (server)..." />
+      <input v-model="activeFilters.search" placeholder="Search by Title..." />
+      <input v-model="activeFilters.author" placeholder="Search by Author..." />
       <select v-model="activeFilters.genre">
         <option value="">All Genres</option>
-        <option v-for="genre in GENRES" :key="genre" :value="genre">{{ genre }}</option>
+        <option v-for="genre in availableGenres" :key="genre" :value="genre">{{ genre }}</option>
       </select>
       <button type="submit" class="search-btn">Search</button>
-      <button type="button" @click="clearSearch" class="clear-btn">Clear</button>
+      <button type="button" @click="clearSearch" class="clear-btn">Clear Search</button>
     </form>
-    
+
     <div class="filters">
-      <input v-model="localFilterText" placeholder="Filter loaded results..." :disabled="isSearchActive" />
+      <input v-model="localFilterText" placeholder="Filter currently loaded results..." :disabled="isSearchActive" />
     </div>
 
     <div class="table-container">
-      <div v-if="loading" class="loading-overlay">Loading...</div>
+      <div v-if="loading" class="loading-overlay"><span>Loading...</span></div>
       <table>
         <thead>
-          <tr>
-            <th>Title</th>
-            <th>Author</th>
-            <th>Genre</th>
-            <th>Price</th>
-            <th>Stock</th>
-            <th>Actions</th>
-          </tr>
+        <tr>
+          <th>Title</th>
+          <th>Author</th>
+          <th>Genre</th>
+          <th>Price</th>
+          <th>Stock</th>
+          <th>Actions</th>
+        </tr>
         </thead>
         <tbody v-if="displayBooks.length > 0">
-          <tr v-for="book in displayBooks" :key="book.id">
-            <td>{{ book.title }}</td>
-            <td>{{ book.author }}</td>
-            <td>{{ book.genre }}</td>
-            <td>${{ book.price.toFixed(2) }}</td>
-            <td>
-              <span :class="getStockClass(book.stock.quantity)">
-                {{ book.stock.quantity }}
-              </span>
-            </td>
-            <td class="actions">
-              <button @click="viewBook(book)" class="action-btn view"><font-awesome-icon icon="eye" /></button>
-              <button @click="editBook(book)" class="action-btn edit"><font-awesome-icon icon="pen" /></button>
-              <button @click="confirmDelete(book)" class="action-btn delete"><font-awesome-icon icon="trash" /></button>
-            </td>
-          </tr>
+        <tr v-for="book in displayBooks" :key="book.id">
+          <td>{{ book.title }}</td>
+          <td>{{ book.author }}</td>
+          <td>{{ book.genre }}</td>
+          <td>${{ (book.price || 0).toFixed(2) }}</td>
+          <td><span :class="getStockClass(book.stock.quantity)">{{ book.stock.quantity }}</span></td>
+          <td class="actions">
+            <button @click="viewBook(book)" class="action-btn view" title="View"><font-awesome-icon icon="eye" /></button>
+            <button @click="editBook(book)" class="action-btn edit" title="Edit"><font-awesome-icon icon="pen" /></button>
+            <button @click="confirmDelete(book)" class="action-btn delete" title="Delete"><font-awesome-icon icon="trash" /></button>
+          </td>
+        </tr>
         </tbody>
         <tbody v-else>
-            <tr>
-                <td colspan="6" class="no-books">No books found for the current criteria.</td>
-            </tr>
+        <tr><td colspan="6" class="no-results">No books found.</td></tr>
         </tbody>
       </table>
     </div>
 
     <div class="footer-actions" v-if="!isSearchActive && hasMore">
-        <button @click="loadBooks(false)" :disabled="loading" class="load-more-btn">
-            {{ loading ? 'Loading...' : 'Load More' }}
-        </button>
+      <button @click="loadBooks" :disabled="loading" class="load-more-btn">
+        {{ loading ? 'Loading...' : 'Load More' }}
+      </button>
     </div>
 
     <BookModal v-if="showModal" :book="selectedBook" :mode="modalMode" @close="closeModal" @save="saveBook" />
-    <div v-if="showDeleteModal" class="delete-modal">
+    <div v-if="showDeleteModal" class="modal-overlay" @click.self="closeModal">
+      <div class="delete-modal-content">
+        <h3>Confirm Delete</h3>
+        <p>Are you sure you want to delete "{{ selectedBook?.title }}"?</p>
+        <div class="delete-modal-actions">
+          <button @click="deleteBook" class="confirm-btn">Delete</button>
+          <button @click="closeModal" class="cancel-btn">Cancel</button>
         </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import BookModal from "@/components/BookModal.vue";
 import { useToast } from "@/composables/useToast";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import { library } from "@fortawesome/fontawesome-svg-core";
+import { faPlus, faEye, faPen, faTrash } from "@fortawesome/free-solid-svg-icons";
 
-// --- STATE MANAGEMENT ---
-const allBooks = ref([]); // Holds the list for "Browse Mode" with pagination
-const searchedBooks = ref(null); // Holds results for "Search Mode". `null` means search is inactive.
-
-const localFilterText = ref(''); // For instant client-side filtering
-const activeFilters = ref({ search: "", genre: "" }); // For the server-side search form
-
-const loading = ref(false);
-const nextCursor = ref(null);
-const hasMore = ref(true);
+library.add(faPlus, faEye, faPen, faTrash);
 
 const { showToast } = useToast();
-const GENRES = ["Fantasy", "Science Fiction", "Mystery", "Thriller", "Romance", "Horror"];
 
-// --- COMPUTED PROPERTIES ---
+// STATE
+const books = ref([]); // For browsable, paginated list
+const searchedBooks = ref(null); // For server search results
+const localFilterText = ref(''); // For instant client-side filtering
+const activeFilters = ref({ search: "", author: "", genre: "" }); // For server-side search form
+const availableGenres = ref([]);
+const loading = ref(false);
+const nextCursorId = ref(null);
+const hasMore = ref(true);
 
-// This intelligently decides which list of books to display
+// COMPUTED
+const isSearchActive = computed(() => searchedBooks.value !== null);
+
 const displayBooks = computed(() => {
   if (isSearchActive.value) {
-    // If a server search is active, show its results
     return searchedBooks.value;
   }
-  
-  // Otherwise, show the client-side filtered list from the paginated "allBooks"
   if (!localFilterText.value) {
-    return allBooks.value;
+    return books.value;
   }
-  return allBooks.value.filter(book =>
-    book.title.toLowerCase().includes(localFilterText.value.toLowerCase())
+  const query = localFilterText.value.toLowerCase();
+  return books.value.filter(book =>
+    book.title.toLowerCase().includes(query) ||
+    book.author.toLowerCase().includes(query)
   );
 });
 
-// A helper to know which mode we are in
-const isSearchActive = computed(() => searchedBooks.value !== null);
-
-// --- DATA FETCHING & ACTIONS ---
-
-/**
- * Main function to load books. Handles both initial load and pagination.
- * @param {boolean} isInitial - If true, clears the current list.
- */
-const loadBooks = async (isInitial = false) => {
-  if (loading.value || (!hasMore.value && !isInitial)) return;
-  loading.value = true;
-
-  if (isInitial) {
-    allBooks.value = [];
-    nextCursor.value = null;
-    hasMore.value = true;
+// METHODS
+const fetchGenres = async () => {
+  try {
+    const response = await axios.get('/api/books/genres');
+    availableGenres.value = response.data;
+  } catch (error) {
+    showToast("Could not load genre list", "error");
   }
+};
 
+const loadBooks = async () => {
+  if (loading.value || !hasMore.value) return;
+  loading.value = true;
   try {
     const params = new URLSearchParams({ limit: 20 });
-    if (nextCursor.value) {
-      params.append('nextCursor', nextCursor.value);
-    }
-    
+    if (nextCursorId.value) params.append('nextCursor', nextCursorId.value);
+
     const response = await axios.get(`/api/books?${params.toString()}`);
-    const { books: newBooks, nextCursor: newCursor } = response.data;
-    
-    allBooks.value.push(...newBooks);
-    nextCursor.value = newCursor;
-    if (!newCursor) {
-      hasMore.value = false;
-    }
+    const { books: newBooks, nextCursor } = response.data;
+
+    books.value.push(...newBooks);
+    nextCursorId.value = nextCursor;
+    if (!nextCursor) hasMore.value = false;
   } catch (error) {
     showToast("Error fetching books", "error");
   } finally {
@@ -151,52 +145,79 @@ const loadBooks = async (isInitial = false) => {
   }
 };
 
-/**
- * Performs a server-side search and switches to "Search Mode".
- */
 const handleServerSearch = async () => {
-    loading.value = true;
-    localFilterText.value = ''; // Clear local filter when doing a server search
-    try {
-        const params = new URLSearchParams({ limit: 100 }); // Get up to 100 results for a search
-        if (activeFilters.value.search) params.append('search', activeFilters.value.search);
-        if (activeFilters.value.genre) params.append('genre', activeFilters.value.genre);
-        
-        const response = await axios.get(`/api/books?${params.toString()}`);
-        searchedBooks.value = response.data.books; // Activate search mode by setting this value
-    } catch (error) {
-        showToast("Error searching books", "error");
-    } finally {
-        loading.value = false;
-    }
+  loading.value = true;
+  localFilterText.value = '';
+  try {
+    const params = new URLSearchParams({ limit: 100 });
+    if (activeFilters.value.search) params.append('search', activeFilters.value.search);
+    if (activeFilters.value.author) params.append('author', activeFilters.value.author);
+    if (activeFilters.value.genre) params.append('genre', activeFilters.value.genre);
+
+    const response = await axios.get(`/api/books?${params.toString()}`);
+    searchedBooks.value = response.data.books;
+  } catch (error) {
+    showToast("Error searching books", "error");
+  } finally {
+    loading.value = false;
+  }
 };
 
-/**
- * Clears the server search results and returns to "Browse Mode".
- */
 const clearSearch = () => {
-    searchedBooks.value = null; // Deactivate search mode
-    activeFilters.value = { search: "", genre: "" };
+  searchedBooks.value = null;
+  activeFilters.value = { search: "", author: "", genre: "" };
+};
+
+const refreshBooks = () => {
+  clearSearch();
+  books.value = [];
+  nextCursorId.value = null;
+  hasMore.value = true;
+  loadBooks();
 };
 
 onMounted(() => {
-  loadBooks(true); // Initial load
+  refreshBooks();
+  fetchGenres();
 });
 
-
-// --- MODAL AND CRUD LOGIC (Largely unchanged, but with better refresh) ---
+// MODAL AND CRUD LOGIC
 const showModal = ref(false);
 const showDeleteModal = ref(false);
 const selectedBook = ref(null);
 const modalMode = ref("add");
 
-const openAddModal = () => { /* ... (no changes needed) ... */ };
-const editBook = (book) => { /* ... (no changes needed) ... */ };
-const viewBook = (book) => { /* ... (no changes needed) ... */ };
-const closeModal = () => { /* ... (no changes needed) ... */ };
-const confirmDelete = (book) => { /* ... (no changes needed) ... */ };
+const openAddModal = () => {
+  selectedBook.value = null;
+  modalMode.value = "add";
+  showModal.value = true;
+};
+
+const editBook = (book) => {
+  selectedBook.value = { ...book };
+  modalMode.value = "edit";
+  showModal.value = true;
+};
+
+const viewBook = (book) => {
+  selectedBook.value = { ...book };
+  modalMode.value = "view";
+  showModal.value = true;
+};
+
+const confirmDelete = (book) => {
+  selectedBook.value = book;
+  showDeleteModal.value = true;
+};
+
+const closeModal = () => {
+  showModal.value = false;
+  showDeleteModal.value = false;
+  selectedBook.value = null;
+};
 
 const saveBook = async (bookData) => {
+  loading.value = true;
   try {
     if (modalMode.value === 'add') {
       await axios.post("/api/books", bookData);
@@ -206,20 +227,34 @@ const saveBook = async (bookData) => {
       showToast("Book updated successfully", "success");
     }
     closeModal();
-    // If we were in a search, re-run it. Otherwise, refresh the main list.
-    isSearchActive.value ? handleServerSearch() : loadBooks(true);
+    refreshBooks();
   } catch (error) {
     showToast("Error saving book", "error");
+  } finally {
+    loading.value = false;
   }
 };
 
 const deleteBook = async () => {
-    // ... (logic is fine, but refresh at the end)
-    isSearchActive.value ? handleServerSearch() : loadBooks(true);
+  if (!selectedBook.value) return;
+  loading.value = true;
+  try {
+    await axios.delete(`/api/books/${selectedBook.value.id}`);
+    showToast("Book deleted successfully", "success");
+    closeModal();
+    refreshBooks();
+  } catch (error) {
+    showToast("Error deleting book", "error");
+  } finally {
+    loading.value = false;
+  }
 };
 
-const getStockClass = (quantity) => { /* ... (no changes needed) ... */ };
-
+const getStockClass = (quantity) => {
+  if (quantity <= 0) return "stock-out";
+  if (quantity < 10) return "stock-low";
+  return "stock-ok";
+};
 </script>
 
 <style scoped>
@@ -356,28 +391,10 @@ th {
   color: white;
 }
 
-  .search-form {
-  display: flex;
-  gap: 1rem;
-  padding: 1rem;
-  background-color: #f8f9fa;
-  border-radius: 8px;
-  margin-bottom: 1.5rem;
-}
-.search-form input, .search-form select {
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  flex-grow: 1;
-}
-.search-btn, .clear-btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
+.search-form { display: flex; gap: 1rem; padding: 1rem; background-color: #f8f9fa; border-radius: 8px; margin-bottom: 1.5rem; }
+.search-form input, .search-form select { padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; flex-grow: 1; }
+.search-btn, .clear-btn { padding: 0.75rem 1.5rem; border: none; border-radius: 4px; cursor: pointer; }
 .search-btn { background-color: #3498db; color: white; }
-.clear-btn { background-color: #95a5a6; color: white; }
 
 .filters {
   margin-bottom: 1.5rem;
@@ -399,10 +416,10 @@ th {
   font-size: 1.5rem;
   z-index: 10;
 }
-.footer-actions {
-    text-align: center;
-    padding: 2rem 0;
-}
+
+.clear-btn { background-color: #95a5a6; color: white; }
+
+.footer-actions { text-align: center; padding: 2rem 0; }
 .load-more-btn {
     background-color: #2c3e50;
     color: white;
@@ -411,8 +428,6 @@ th {
     border-radius: 4px;
     cursor: pointer;
 }
-.load-more-btn:disabled {
-    background-color: #ccc;
-}
-.no-books { text-align: center; padding: 2rem; color: #666; }
+.load-more-btn { background-color: #2c3e50; color: white; padding: 0.75rem 2rem; border: none; border-radius: 4px; cursor: pointer; }
+.load-more-btn:disabled { background-color: #ccc; }
 </style>

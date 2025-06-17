@@ -1,6 +1,6 @@
 const express = require("express");
 const ratingController = require("../controllers/rating");
-const { verifyToken, isOwnerOrAdmin } = require("../middleware/auth");
+const { verifyToken, isOwnerOrAdmin } = require("../middlewares/auth");
 
 const router = express.Router();
 
@@ -17,6 +17,6 @@ router.put("/book/:bookId", verifyToken, ratingController.addOrUpdateRating);
 
 // A user can get their own ratings, or an admin can get any user's ratings.
 // Our isOwnerOrAdmin middleware is perfect for this.
-router.get("/user/:userId", [verifyToken, isOwnerOrAdmin], ratingController.getUserRatings);
+router.get("/user/:userId", verifyToken, isOwnerOrAdmin, ratingController.getUserRatings);
 
 module.exports = router;

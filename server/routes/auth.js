@@ -1,15 +1,20 @@
 const express = require("express");
-const authController = require("../controllers/auth");
-const authMiddleware = require("../middlewares/auth"); // Correct import path
+const authController = require("../controllers/auth"); // Using consistent naming
+// CORRECT IMPORT: Destructure to get the exact `verifyToken` function you need.
+const { verifyToken } = require("../middlewares/auth");
 
 const router = express.Router();
 
-// Public routes for authentication
-router.post("/register", authController.register); // No auth needed
-router.post("/login", authController.login); // No auth needed
+// --- Public Routes ---
+// These do not need middleware.
+router.post("/register", authController.register);
+router.post("/login", authController.login);
 
-// Protected routes for user profile
-router.get("/profile", authMiddleware, authController.getProfile); // Correctly protected by authMiddleware
-router.post("/logout", authMiddleware, authController.logout); // Correctly protected by authMiddleware
+
+// --- Protected Routes ---
+// These routes now correctly use the `verifyToken` FUNCTION.
+router.get("/profile", verifyToken, authController.getProfile);
+router.post("/logout", verifyToken, authController.logout);
+
 
 module.exports = router;

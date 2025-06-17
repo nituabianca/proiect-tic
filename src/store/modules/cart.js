@@ -70,25 +70,28 @@ const actions = {
     commit("UPDATE_QUANTITY", payload);
   },
 
-async checkout({ commit, state }) {
+  async checkout({ commit, state, rootState }) { // Added rootState
     commit("SET_LOADING", true);
     try {
-      // The backend expects this specific, lean format.
       const orderData = {
         items: state.items.map(item => ({
           bookId: item.id,
           quantity: item.quantity,
-          priceAtPurchase: item.price // The price when the order was placed
+          priceAtPurchase: item.price
         })),
-        // The totalAmount will be calculated on the backend for security and accuracy,
-        // but we can send our calculation for reference if needed.
-        // Let's rely on the backend calculation.
+        // We pass the userId from the auth store
+        userId: rootState.auth.user.id
       };
 
       const response = await axios.post("/api/orders", orderData);
-      
+
+      // THE FIX: The new order object, including its ID, is inside `response.data.order`
+      const newOrder = response.data.order;
+
       commit("CLEAR_CART");
-      return response.data;
+
+      // Now we can return the full order object for redirection
+      return newOrder;
     } catch (error) {
       commit("SET_ERROR", error.response?.data?.error || "Checkout failed.");
       throw error;
@@ -96,11 +99,17 @@ async checkout({ commit, state }) {
       commit("SET_LOADING", false);
     }
   },
+};
 
 const getters = {
   cartTotal: (state) =>
-    state.items.reduce((sum, item) => sum + item.price * item.quantity, 0),
-  itemCount: (state) => state.items.length,
+    state.items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0),
+  itemCount: (state) =>
+    state.items.reduce((sum, item) => sum + item.quantity, 0),
+
+  // --- THIS IS THE FIX ---
+  // This getter provides the array of items to the component.
+  cartItems: (state) => state.items,
 };
 
 export default {

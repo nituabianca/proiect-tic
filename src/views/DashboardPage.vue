@@ -186,11 +186,8 @@ export default {
     });
 
     const calculateOrderTotal = (order) => {
-      if (!order.items?.length) return 0;
-      return order.items.reduce((sum, item) => {
-        const itemTotal = item.price * item.quantity;
-        return !isNaN(itemTotal) ? sum + itemTotal : sum;
-      }, 0);
+      // THE FIX: Use the 'totalAmount' field from our backend order object.
+      return order.totalAmount || 0;
     };
 
     const fetchProfile = async () => {
@@ -212,11 +209,15 @@ export default {
 
     const fetchRecentOrders = async () => {
       try {
-        const response = await axios.get("/api/orders");
-        recentOrders.value = response.data;
-        recentOrders.value.sort(
-          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-        );
+        // We call the same endpoint, but now we handle the new response shape.
+        // We can also add a limit to only get the newest ones.
+        const response = await axios.get("/api/orders?limit=10");
+
+        // THE FIX: The data is now inside the 'orders' property of the response.
+        recentOrders.value = response.data.orders;
+
+        // The sorting logic you had is no longer needed because the backend
+        // already sorts by createdAt in descending order by default.
       } catch (error) {
         console.error("Error fetching orders:", error);
       }

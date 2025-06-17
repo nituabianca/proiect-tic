@@ -88,7 +88,7 @@ const getUserBasedRecommendations = async (userId, limit = 10) => {
   }
 };
 
-**
+/**
  * Gets recommendations using Item-Based Collaborative Filtering.
  * LOGIC: "If you liked these specific books, you might also like these other books that are often enjoyed by the same people."
  * 1. Find the books the target user has rated highly (the "seed" set).
@@ -96,6 +96,7 @@ const getUserBasedRecommendations = async (userId, limit = 10) => {
  * 3. Look at all the *other* books this "fellow fan" group rated highly.
  * 4. Aggregate these other books, rank them by how many fellow fans liked them, and return the top results.
  * @param {string} userId The user to get recommendations for.
+ * @param limit
  * @returns {Promise<Array<object>>} A list of recommended book objects.
  */
 const getItemBasedRecommendations = async (userId, limit = 10) => {
@@ -150,6 +151,7 @@ const getItemBasedRecommendations = async (userId, limit = 10) => {
  * LOGIC: "Since you are looking at Book X, here are other books with the same genre and by the same author."
  * This is perfect for a "More Like This" section on a book detail page.
  * @param {string} bookId The ID of the book to find similarities for.
+ * @param limit
  * @returns {Promise<Array<object>>} A list of similar book objects.
  */
 const getContentBasedSimilarities = async (bookId, limit = 5) => {

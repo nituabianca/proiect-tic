@@ -7,7 +7,7 @@ const ALL_BOOKS_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours for all books data
 
 // --- Existing Functions (unchanged) ---
 
-const queryBookById = async (id) => {
+const getBookById = async (id) => {
   try {
     const snapshot = await db.collection("books").doc(id).get();
     if (snapshot.exists) {
@@ -21,37 +21,36 @@ const queryBookById = async (id) => {
 };
 
 /**
- * Fetches a paginated and/or filtered list of books.
+ * A simplified and robust function to get books with pagination and filtering.
+ * This version separates search logic from other filters to avoid indexing conflicts.
  * @param {object} options
- * @param {number} [options.limit=12] - The number of books per page.
- * @param {string|null} [options.startAfterId=null] - The cursor for pagination.
- * @param {object} [options.filters={}] - An object with filter criteria.
  * @returns {Promise<{books: Array<object>, nextCursor: string|null}>}
  */
-const getBooks = async ({ limit = 12, startAfterId = null, filters = {} }) => {
+const getBooks = async ({ limit = 20, startAfterId = null, filters = {} }) => {
   try {
     let query = db.collection("books");
 
-    // --- Apply Filters ---
-    // Note: Firestore requires creating indexes for most compound queries.
-    // You will be prompted in the firebase console error logs with a link to create them.
-    if (filters.genre) {
-      query = query.where("genre", "==", filters.genre);
-    }
+    // --- QUERY BUILDING LOGIC ---
+
     if (filters.search) {
-      // This is a "starts with" search, which is the most common for Firestore without a third-party service.
+      // IF A TITLE SEARCH IS PERFORMED: This is the only filter we apply.
+      // Firestore requires the first orderBy to be on the field used for range comparisons.
       query = query.orderBy("title")
-                   .where("title", ">=", filters.search)
-                   .where("title", "<=", filters.search + "\uf8ff");
+        .where("title", ">=", filters.search)
+        .where("title", "<=", filters.search + "\uf8ff");
+    } else {
+      // IF NOT SEARCHING BY TITLE: Apply metadata filters.
+      if (filters.author) {
+        query = query.where("author", "==", filters.author);
+      }
+      if (filters.genre) {
+        query = query.where("genre", "==", filters.genre);
+      }
+      // And apply the default sort order.
+      query = query.orderBy("createdAt", "desc");
     }
 
-    // --- Apply Sorting ---
-    // You must order by the field you use for inequality filters. If no search, we can sort by another field.
-    if (!filters.search) {
-      query = query.orderBy("createdAt", "desc"); // Default sort for admin panel could be newest first
-    }
-    
-    // --- Apply Pagination ---
+    // --- PAGINATION LOGIC ---
     if (startAfterId) {
       const startAfterDoc = await db.collection("books").doc(startAfterId).get();
       if (startAfterDoc.exists) {
@@ -62,16 +61,20 @@ const getBooks = async ({ limit = 12, startAfterId = null, filters = {} }) => {
     const snapshot = await query.limit(limit).get();
     const books = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
-    // --- Determine Next Cursor ---
     const lastVisibleDoc = snapshot.docs[snapshot.docs.length - 1];
     const nextCursor = books.length < limit ? null : lastVisibleDoc?.id || null;
 
     return { books, nextCursor };
   } catch (error) {
-    console.error("Error fetching paginated/filtered books:", error);
-    throw new Error("Failed to fetch books");
+    console.error("Error fetching books:", error);
+    // This will now catch "missing index" errors and send a helpful message to the frontend.
+    if (error.code === 9) { // 9 is FAILED_PRECONDITION
+      throw new Error("A database index is required for this query. Please check your backend terminal logs for a creation link.");
+    }
+    throw new Error("Failed to fetch books from database.");
   }
 };
+
 
 const getAllBooks = async () => {
   try {
@@ -258,7 +261,7 @@ const updateBookStock = async (id, quantity) => {
 };
 
 module.exports = {
-  queryBookById,
+  getBookById,
   getBooks,
   getAllBooks,
   getReadBookIdsByUserId,

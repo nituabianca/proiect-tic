@@ -1,25 +1,23 @@
 // backend/controllers/bookController.js
 const bookService = require("../services/books");
 const mlService = require("../services/mlService"); // NEW: Import mlService
+const { GENRES } = require("../constants/bookData");
 
 const bookController = {
   async getAllBooks(req, res) {
     try {
-      const { limit, nextCursor, search, genre } = req.query;
-      
-      // Assemble filter object for the service
-      const filters = {};
-      if (search) filters.search = search;
-      if (genre) filters.genre = genre;
-      
+      const { limit, nextCursor, search, author, genre } = req.query;
+      const filters = { search, author, genre };
+
       const result = await bookService.getBooks({
         limit: parseInt(limit) || 12,
         startAfterId: nextCursor || null,
         filters,
       });
-      
+
       res.status(200).json(result);
     } catch (error) {
+      // Send back the specific error from Firestore if available
       res.status(500).json({ error: error.message });
     }
   },
@@ -34,6 +32,15 @@ const bookController = {
       res.status(200).json(book);
     } catch (error) {
       res.status(500).json({ error: error.message });
+    }
+  },
+
+  async getAvailableGenres(req, res) {
+    try {
+      // Simply return the constant list
+      res.status(200).json(GENRES);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to retrieve genres." });
     }
   },
 
@@ -126,13 +133,10 @@ const bookController = {
   async getTrendingBooks(req, res) {
     try {
       const num = parseInt(req.query.num) || 10;
-      const trendingBooks = await mlService.getTrendingBooks(num);
+      // We call getNewReleases, which is the correct function name in mlService
+      const trendingBooks = await mlService.getNewReleases(num);
       res.status(200).json(trendingBooks);
     } catch (error) {
-      console.error(
-        "Error fetching trending books from bookController:",
-        error
-      );
       res.status(500).json({ error: "Failed to fetch trending books." });
     }
   },

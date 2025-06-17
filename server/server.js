@@ -22,7 +22,8 @@ app.use(helmet()); // <-- 3. Use helmet to set secure HTTP headers
 // --- CORS Configuration ---
 const corsOptions = {
   // Use the environment variable for the origin
-  origin: process.env.CLIENT_ORIGIN,
+  // origin: process.env.CLIENT_ORIGIN,
+  origin: 'http://localhost:3001',
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
   allowedHeaders: ["Content-Type", "Authorization"],

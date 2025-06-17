@@ -1,6 +1,6 @@
 // backend/services/recommendationService.js
 const mlService = require("./mlService");
-const bookService = require("./bookService");
+const bookService = require("./books");
 
 /**
  * Generates a hybrid list of recommendations for a user.

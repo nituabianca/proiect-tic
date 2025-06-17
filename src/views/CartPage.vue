@@ -9,9 +9,7 @@
       <div class="empty-cart-content">
         <font-awesome-icon icon="shopping-cart" class="empty-cart-icon" />
         <p>Your cart is looking a little empty!</p>
-        <router-link to="/books" class="continue-shopping-btn"
-          >Start Shopping</router-link
-        >
+        <router-link to="/books" class="continue-shopping-btn">Start Shopping</router-link>
       </div>
     </div>
 
@@ -21,50 +19,23 @@
         <div class="cart-items-list">
           <div v-for="item in items" :key="item.id" class="cart-item-card">
             <div class="item-main-info">
-              <img
-                :src="
-                  item.cover ||
-                  'https://via.placeholder.com/100x150?text=No+Cover'
-                "
-                :alt="item.title"
-                class="item-cover"
-                @error="handleImageError"
-              />
+              <img :src="item.coverImageUrl" :alt="item.title" class="item-cover" @error="handleImageError"/>
               <div class="item-details">
                 <h4 class="item-title">{{ item.title }}</h4>
                 <p class="item-author">{{ item.author }}</p>
-                <span class="item-price-unit"
-                  >${{ item.price.toFixed(2) }} / item</span
-                >
+                <span class="item-price-unit">${{ (item.price || 0).toFixed(2) }} / item</span>
               </div>
             </div>
-
             <div class="item-controls">
               <div class="quantity-controls">
-                <button
-                  @click="updateQuantity(item.id, item.quantity - 1)"
-                  :disabled="item.quantity <= 1"
-                  class="quantity-btn"
-                >
-                  -
-                </button>
+                <button @click="updateQuantity(item.id, item.quantity - 1)" :disabled="item.quantity <= 1" class="quantity-btn">-</button>
                 <span class="quantity-display">{{ item.quantity }}</span>
-                <button
-                  @click="updateQuantity(item.id, item.quantity + 1)"
-                  :disabled="item.quantity >= item.stock?.quantity"
-                  class="quantity-btn"
-                >
-                  +
-                </button>
+                <button @click="updateQuantity(item.id, item.quantity + 1)" :disabled="item.quantity >= item.stock?.quantity" class="quantity-btn">+</button>
               </div>
-
               <div class="item-subtotal">
                 Subtotal:
-                <span class="price-highlight"
-                  >${{ (item.price * item.quantity).toFixed(2) }}</span
-                >
+                <span class="price-highlight">${{ (item.price * item.quantity).toFixed(2) }}</span>
               </div>
-
               <button @click="removeItem(item.id)" class="remove-item-btn">
                 <font-awesome-icon icon="trash-alt" /> Remove
               </button>
@@ -77,10 +48,6 @@
         <h3>Order Summary</h3>
         <div class="summary-details">
           <div class="summary-row">
-            <span>Items ({{ itemCount }})</span>
-            <span>{{ itemCount }}</span>
-          </div>
-          <div class="summary-row">
             <span>Subtotal</span>
             <span>${{ cartTotal.toFixed(2) }}</span>
           </div>
@@ -90,19 +57,12 @@
           </div>
           <div class="summary-total">
             <span>Total</span>
-            <span class="price-highlight large-total"
-              >${{ cartTotal.toFixed(2) }}</span
-            >
+            <span class="price-highlight large-total">${{ cartTotal.toFixed(2) }}</span>
           </div>
         </div>
-
-        <button @click="checkout" class="checkout-btn" :disabled="loading">
+        <button @click="checkout" class="checkout-btn" :disabled="loading || !items.length">
           {{ loading ? "Processing..." : "Proceed to Checkout" }}
-          <font-awesome-icon
-            v-if="!loading"
-            icon="arrow-right"
-            class="btn-icon"
-          />
+          <font-awesome-icon v-if="!loading" icon="arrow-right" class="btn-icon"/>
           <font-awesome-icon v-else icon="spinner" spin class="btn-icon" />
         </button>
       </div>
@@ -110,66 +70,59 @@
   </div>
 </template>
 
-<script>
-/* eslint-disable */
+<script setup>
 import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome"; // Ensure FontAwesome is set up in your main.js
+import { useToast } from "@/composables/useToast";
+import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import { library } from "@fortawesome/fontawesome-svg-core";
+import { faShoppingCart, faArrowRight, faSpinner, faTrashAlt } from "@fortawesome/free-solid-svg-icons";
 
-export default {
-  name: "CartPage",
-  components: {
-    FontAwesomeIcon,
-  },
-  setup() {
-    const store = useStore();
-    const router = useRouter();
+// All imports and variables are automatically available to the template
+library.add(faShoppingCart, faArrowRight, faSpinner, faTrashAlt);
 
-    const items = computed(() => store.state.cart.items);
-    const loading = computed(() => store.state.cart.loading);
-    const cartTotal = computed(() => store.getters["cart/cartTotal"]);
-    const itemCount = computed(() => store.getters["cart/itemCount"]);
+const store = useStore();
+const router = useRouter();
+const { showToast } = useToast();
 
-    const updateQuantity = (id, quantity) => {
-      if (quantity > 0) {
-        store.dispatch("cart/updateQuantity", { id, quantity });
-      }
-    };
+const items = computed(() => store.getters["cart/cartItems"]);
+const loading = computed(() => store.state.cart.loading);
+const cartTotal = computed(() => store.getters["cart/cartTotal"]);
+const itemCount = computed(() => store.getters["cart/itemCount"]);
 
-    const removeItem = (id) => {
-      store.dispatch("cart/removeFromCart", id);
-    };
+const updateQuantity = (id, quantity) => {
+  if (quantity >= 1) {
+    store.dispatch("cart/updateQuantity", { id, quantity });
+  }
+};
 
-    const checkout = async () => {
-      try {
-        const order = await store.dispatch("cart/checkout");
-        router.push(`/orders/${order.id}`);
-      } catch (error) {
-        console.error("Checkout failed:", error);
-        // Optionally show a user-friendly error message
-        alert("Checkout failed. Please try again.");
-      }
-    };
+const removeItem = (id) => {
+  store.dispatch("cart/removeFromCart", id);
+  showToast("Item removed from cart", "info");
+};
 
-    const handleImageError = (event) => {
-      event.target.src = "https://via.placeholder.com/100x150?text=No+Cover"; // Fallback image
-      event.target.alt = "No Cover Available";
-    };
+const checkout = async () => {
+  try {
+    const newOrder = await store.dispatch("cart/checkout");
+    if (newOrder && newOrder.id) {
+      showToast("Checkout successful! Redirecting...", "success");
+      router.push(`/orders/${newOrder.id}`);
+    } else {
+      // Handle case where checkout action doesn't return a valid order
+      showToast("There was an issue creating your order. Please try again.", "error");
+    }
+  } catch (error) {
+    showToast(error.message || "Checkout failed. Please try again.", "error");
+    console.error("Checkout failed:", error);
+  }
+};
 
-    return {
-      items,
-      loading,
-      cartTotal,
-      itemCount,
-      updateQuantity,
-      removeItem,
-      checkout,
-      handleImageError,
-    };
-  },
+const handleImageError = (event) => {
+  event.target.src = "https://via.placeholder.com/100x150?text=No+Cover";
 };
 </script>
+
 
 <style scoped>
 /* Base styles for the cart container */

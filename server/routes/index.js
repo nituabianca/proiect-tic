@@ -1,4 +1,3 @@
-// backend/routes/index.js
 const express = require("express");
 const authRoutes = require("./auth");
 const userRoutes = require("./users");
@@ -8,6 +7,7 @@ const orderRoutes = require("./orders");
 const recommendationRoutes = require("./recommendations");
 const statisticsRoutes = require("./statistics");
 const libraryRoutes = require("./library")
+const devRoutes = require("./devRoutes");
 
 const router = express.Router();
 
@@ -19,5 +19,6 @@ router.use("/orders", orderRoutes);
 router.use("/recommendations", recommendationRoutes);
 router.use("/statistics", statisticsRoutes);
 router.use("/library", libraryRoutes);
+router.use("/dev", devRoutes);
 
 module.exports = router;

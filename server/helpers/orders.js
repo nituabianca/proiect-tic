@@ -16,7 +16,7 @@ const generateMockOrder = (options = {}) => {
   );
 
   return {
-    id: faker.string.uuid(),
+    // id: faker.string.uuid(),
     userId: options.userId || faker.string.uuid(),
     items,
     totalAmount,

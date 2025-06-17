@@ -2,14 +2,16 @@
 import { createRouter, createWebHistory } from "vue-router";
 import LoginPage from "@/views/LoginPage.vue";
 import RegisterPage from "@/views/RegisterPage.vue";
-import VerifyEmailPage from "@/views/VerifyEmailPage.vue";
-import BooksPage from "@/views/BookPage.vue";
+import LandingPage from "@/views/LandingPage.vue";
+import BooksPage from "@/views/BooksPage.vue";
 import DashboardPage from "@/views/DashboardPage.vue";
 import ManageBooksPage from "@/views/ManageBooksPage.vue";
 import ProfilePage from "@/views/ProfilePage.vue";
 import CartPage from "@/views/CartPage.vue";
 import OrderDetailsPage from "@/views/OrderDetailsPage.vue";
 import ManageOrdersPage from "@/views/ManageOrdersPage.vue";
+import BookDetailPage from "@/views/BookDetailPage.vue";
+import MyLibraryPage from "@/views/MyLibraryPage.vue";
 
 import store from "@/store"; // Make sure this path is correct
 
@@ -44,6 +46,18 @@ const routes = [
     name: "ManageBooks",
     component: ManageBooksPage,
     meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/books/:id', // A dynamic path that accepts a book ID
+    name: 'BookDetail',
+    component: BookDetailPage,
+    meta: { requiresAuth: false } // Anyone can view a book's details
+  },
+  {
+    path: '/my-library',
+    name: 'MyLibrary',
+    component: MyLibraryPage,
+    meta: { requiresAuth: false } // Anyone can view a book's details
   },
   {
     path: "/profile",

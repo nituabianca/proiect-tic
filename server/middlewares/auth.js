@@ -1,13 +1,10 @@
-
-const orderService = require("../services/orders");
-
 const jwt = require("jsonwebtoken");
+const orderService = require("../services/orders"); // Correctly imports orderService
 const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
- * 1. Base Authentication: Verifies the JWT.
- * This should run first for any protected route. It checks for a valid token
- * and attaches the user payload { id, email, role } to the request object.
+ * Verifies the JWT from the Authorization header.
+ * Attaches the user payload { id, email, role } to req.user.
  */
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -17,7 +14,7 @@ const verifyToken = (req, res, next) => {
   const token = authHeader.split(" ")[1];
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; // Attach user payload
+    req.user = decoded;
     next();
   } catch (error) {
     if (error.name === "TokenExpiredError") {
@@ -28,7 +25,7 @@ const verifyToken = (req, res, next) => {
 };
 
 /**
- * 2. Admin Authorization: Checks for 'admin' role.
+ * Checks if the authenticated user has the 'admin' role.
  * This must run *after* verifyToken.
  */
 const isAdmin = (req, res, next) => {
@@ -39,18 +36,22 @@ const isAdmin = (req, res, next) => {
 };
 
 /**
- * 3. Ownership Authorization: Checks if the user owns the resource or is an admin.
- * This is perfect for routes like GET/PUT /api/users/:id.
- * It must run *after* verifyToken.
+ * Checks if the user owns the resource (e.g., a user profile) or is an admin.
+ * It compares the token's user ID with the ID in the URL params.
+ * This must run *after* verifyToken.
  */
 const isOwnerOrAdmin = (req, res, next) => {
-  // req.user.id comes from the token. req.params.id comes from the URL.
   if (req.user && (req.user.id === req.params.id || req.user.role === 'admin')) {
     return next();
   }
   return res.status(403).json({ error: "Forbidden. You do not have permission to access this resource." });
 };
 
+/**
+ * Checks if the user owns a specific ORDER or is an admin.
+ * It fetches the order to check its `userId` field.
+ * This must run *after* verifyToken.
+ */
 const isOrderOwnerOrAdmin = async (req, res, next) => {
   try {
     if (req.user.role === 'admin') {
@@ -58,13 +59,12 @@ const isOrderOwnerOrAdmin = async (req, res, next) => {
     }
 
     const orderId = req.params.id;
-    const order = await orderService.getOrderById(orderId); // Use the service to get the order
+    const order = await orderService.getOrderById(orderId);
 
     if (!order) {
       return res.status(404).json({ error: "Order not found." });
     }
-    
-    // Check if the logged-in user's ID matches the order's userId
+
     if (order.userId === req.user.id) {
       return next();
     }
@@ -77,9 +77,10 @@ const isOrderOwnerOrAdmin = async (req, res, next) => {
   }
 };
 
+
 module.exports = {
   verifyToken,
   isAdmin,
   isOwnerOrAdmin,
-  isOrderOwnerOrAdmin,
+  isOrderOwnerOrAdmin, // Make sure this is exported
 };

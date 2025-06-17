@@ -1,15 +1,8 @@
 <template>
-  <div class="profile-container">
+  <div class="profile-container" v-if="user">
     <div class="profile-header">
       <h1>Profile Settings</h1>
-      <div class="user-info-summary">
-        <div
-          class="email-verify-status"
-          :class="{ verified: user?.emailVerified }"
-        >
-          {{ user?.emailVerified ? "Email Verified" : "Email Not Verified" }}
-        </div>
-      </div>
+      <h2>Welcome, {{ user.firstName }}!</h2>
     </div>
 
     <div class="profile-content">
@@ -19,48 +12,24 @@
             <label>First Name</label>
             <input type="text" v-model="formData.firstName" required />
           </div>
-
           <div class="form-group">
             <label>Last Name</label>
             <input type="text" v-model="formData.lastName" required />
           </div>
-
           <div class="form-group">
             <label>Email</label>
             <input type="email" v-model="formData.email" required disabled />
           </div>
-
           <div class="form-group full-width">
             <label>Address</label>
             <div class="address-fields">
-              <input
-                type="text"
-                v-model="formData.address.street"
-                placeholder="Street"
-              />
-              <input
-                type="text"
-                v-model="formData.address.city"
-                placeholder="City"
-              />
-              <input
-                type="text"
-                v-model="formData.address.state"
-                placeholder="State"
-              />
-              <input
-                type="text"
-                v-model="formData.address.zipCode"
-                placeholder="ZIP Code"
-              />
-              <input
-                type="text"
-                v-model="formData.address.country"
-                placeholder="Country"
-              />
+              <input type="text" v-model="formData.address.street" placeholder="Street" />
+              <input type="text" v-model="formData.address.city" placeholder="City" />
+              <input type="text" v-model="formData.address.state" placeholder="State" />
+              <input type="text" v-model="formData.address.zipCode" placeholder="ZIP Code" />
+              <input type="text" v-model="formData.address.country" placeholder="Country" />
             </div>
           </div>
-
           <div class="form-group">
             <label>Language</label>
             <select v-model="formData.preferences.language">
@@ -69,22 +38,15 @@
               <option value="FR">French</option>
             </select>
           </div>
-
           <div class="form-group">
             <label>Preferences</label>
             <div class="checkbox-group">
               <label>
-                <input
-                  type="checkbox"
-                  v-model="formData.preferences.newsletter"
-                />
+                <input type="checkbox" v-model="formData.preferences.newsletter" />
                 Subscribe to Newsletter
               </label>
               <label>
-                <input
-                  type="checkbox"
-                  v-model="formData.preferences.notifications"
-                />
+                <input type="checkbox" v-model="formData.preferences.notifications" />
                 Enable Notifications
               </label>
             </div>
@@ -92,14 +54,6 @@
         </div>
 
         <div class="form-actions">
-          <button
-            v-if="!user?.emailVerified"
-            type="button"
-            class="verify-btn"
-            @click="resendVerification"
-          >
-            Resend Verification Email
-          </button>
           <button type="submit" class="save-btn" :disabled="loading">
             {{ loading ? "Saving..." : "Save Changes" }}
           </button>
@@ -110,167 +64,280 @@
         <div class="recent-orders">
           <h2>Recent Orders</h2>
           <div v-if="orders.length" class="orders-list">
-            <div v-for="order in orders" :key="order.id" class="order-item">
+            <div v-for="order in orders.slice(0, 3)" :key="order.id" class="order-item">
               <div class="order-header">
-                <span class="order-id">Order #{{ order.id }}</span>
+                <span class="order-id">Order #{{ order.id.slice(-6) }}</span>
                 <span class="order-date">{{ formatDate(order.createdAt) }}</span>
               </div>
-              <div class="order-status" :class="order.orderStatus">
-                {{ order.orderStatus }}
-              </div>
-              <div class="order-info">
-                <div class="order-items-count">
-                  {{ order.items.length }} items
-                </div>
-                <div class="order-total">${{ order.total.toFixed(2) }}</div>
-              </div>
-              <router-link :to="'/orders/' + order.id" class="view-order-btn">
-                View Details
-              </router-link>
+              <div class="order-status" :class="order.status">{{ order.status }}</div>
             </div>
           </div>
           <div v-else class="no-orders">No orders yet</div>
         </div>
+
+        <div v-if="isAdmin" class="admin-panel">
+          <h2><font-awesome-icon icon="tools" /> Developer Control Panel</h2>
+
+          <div class="panel-section">
+            <h3>Seeding Tools</h3>
+            <div class="action-item">
+              <input type="number" v-model.number="seedCounts.books" />
+              <button @click="handleSeed('books')" :disabled="loading" class="seed-btn">Seed Books</button>
+            </div>
+            <div class="action-item">
+              <input type="number" v-model.number="seedCounts.users" />
+              <button @click="handleSeed('users')" :disabled="loading" class="seed-btn">Seed Users</button>
+            </div>
+            <div class="action-item">
+              <input type="number" v-model.number="seedCounts.orders" />
+              <button @click="handleSeed('orders')" :disabled="loading" class="seed-btn">Seed Orders</button>
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <h3>Deletion Tools (Danger Zone)</h3>
+            <div class="action-item">
+              <button @click="handleDelete('books')" :disabled="loading" class="delete-btn">Delete All Books</button>
+              <button @click="handleDelete('orders')" :disabled="loading" class="delete-btn">Delete All Orders</button>
+              <button @click="handleDelete('users')" :disabled="loading" class="delete-btn">Delete All Users</button>
+            </div>
+          </div>
+
+          <div class="panel-section">
+            <h3>All-In-One</h3>
+            <div class="action-item">
+              <button @click="handleResetDatabase" class="reset-btn" :disabled="loading">
+                <font-awesome-icon icon="skull-crossbones" /> Reset Entire Database
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
+  <div v-else class="loading-profile">Loading profile...</div>
 </template>
 
-<script>
-/* eslint-disable */
-import { ref, onMounted } from "vue";
-import { useStore } from "vuex";
+<script setup>
+import { ref, onMounted, computed, watch } from 'vue';
+import { useStore } from 'vuex';
 import { useToast } from "@/composables/useToast";
-import axios from "axios";
+import axios from 'axios';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { library } from "@fortawesome/fontawesome-svg-core";
+import { faSkullCrossbones, faSeedling } from "@fortawesome/free-solid-svg-icons";
+import { faTools } from "@fortawesome/free-solid-svg-icons";
 
-export default {
-  name: "ProfilePage",
-  setup() {
-    /*eslint-disable*/
-    const store = useStore();
-    const { showToast } = useToast();
-    const loading = ref(false);
-    const user = ref(null);
-    const orders = ref([]);
+library.add(faTools);
+library.add(faSkullCrossbones, faSeedling);
 
-    const formData = ref({
-      firstName: "",
-      lastName: "",
-      email: "",
-      address: {
-        street: "",
-        city: "",
-        state: "",
-        zipCode: "",
-        country: "",
-      },
-      preferences: {
-        language: "EN",
-        newsletter: false,
-        notifications: false,
-      },
-    });
+const store = useStore();
+const { showToast } = useToast();
+const loading = ref(false);
+const orders = ref([]);
 
-    const fetchProfile = async () => {
-      try {
-        const response = await axios.get(`/api/auth/profile`);
-        user.value = response.data;
-        formData.value = {
-          firstName: response.data.firstName || "",
-          lastName: response.data.lastName || "",
-          email: response.data.email || "",
-          address: response.data.address || {
-            street: "",
-            city: "",
-            state: "",
-            zipCode: "",
-            country: "",
-          },
-          preferences: response.data.preferences || {
-            language: "EN",
-            newsletter: false,
-            notifications: false,
-          },
-        };
-      } catch (error) {
-        showToast("Error fetching profile", "error");
-      }
+// Get user data directly from the Vuex store
+const user = computed(() => store.getters['auth/currentUser']);
+const isAdmin = computed(() => store.getters['auth/isAdmin']);
+
+const formData = ref({
+  firstName: "",
+  lastName: "",
+  email: "",
+  address: { street: "", city: "", state: "", zipCode: "", country: "" },
+  preferences: { language: "EN", newsletter: false, notifications: false },
+});
+
+// NEW: State for seeder counts
+const seedCounts = ref({
+  books: 50,
+  users: 10,
+  orders: 25,
+});
+
+// Watch for the user data to become available from the store and populate the form
+watch(user, (newUser) => {
+  if (newUser) {
+    formData.value = {
+      ...formData.value, // Keep default structure
+      firstName: newUser.firstName || "",
+      lastName: newUser.lastName || "",
+      email: newUser.email || "",
+      address: newUser.address || formData.value.address,
+      preferences: newUser.preferences || formData.value.preferences,
     };
+  }
+}, { immediate: true }); // `immediate: true` runs the watcher on component load
 
-    const fetchOrders = async () => {
-      try {
-        const response = await axios.get("/api/orders/my");
-        orders.value = response.data;
-      } catch (error) {
-        showToast("Error fetching orders", "error");
-      }
-    };
-
-    const updateProfile = async () => {
-      loading.value = true;
-      try {
-        await axios.put(`/api/users/${user.value.id}`, formData.value);
-        await fetchProfile(); // Refresh profile data
-        showToast("Profile updated successfully", "success");
-      } catch (error) {
-        showToast("Error updating profile", "error");
-      } finally {
-        loading.value = false;
-      }
-    };
-
-    const resendVerification = async () => {
-      try {
-        await axios.post("/api/auth/verify/resend");
-        showToast("Verification email sent", "success");
-      } catch (error) {
-        showToast("Error sending verification email", "error");
-      }
-    };
-
-
-    const formatDate = (timestamp) => {
-      if (!timestamp) return 'No date';
-
-      // Handle Firestore Timestamp
-      if (timestamp.seconds) {
-        return new Date(timestamp.seconds * 1000).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-      }
-
-      // Handle regular date string
-      return new Date(timestamp).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    };
-    onMounted(() => {
-      fetchProfile();
-      fetchOrders();
-    });
-
-    return {
-      user,
-      formData,
-      orders,
-      loading,
-      updateProfile,
-      resendVerification,
-      formatDate,
-    };
-  },
+const fetchOrders = async () => {
+  try {
+    // CORRECTED: The endpoint for a user's own orders
+    const response = await axios.get("/api/orders/my-orders");
+    orders.value = response.data;
+  } catch (error) {
+    showToast("Error fetching recent orders", "error");
+  }
 };
+
+const updateProfile = async () => {
+  if (!user.value) return;
+  loading.value = true;
+  try {
+    await axios.put(`/api/users/${user.value.id}`, formData.value);
+    // Refresh the user profile in the store
+    await store.dispatch('auth/fetchUserProfile');
+    showToast("Profile updated successfully", "success");
+  } catch (error) {
+    showToast("Error updating profile", "error");
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleResetDatabase = async () => {
+  if (confirm("DANGER: Are you absolutely sure you want to delete the entire database? This cannot be undone.")) {
+    loading.value = true;
+    try {
+      await axios.post('/api/dev/reset-database');
+      showToast("Database has been reset successfully!", "success");
+      // Log the user out as their account no longer exists
+      await store.dispatch('auth/logout');
+      window.location.href = '/login';
+    } catch (error) {
+      showToast("Error resetting database. Check server logs.", "error");
+    } finally {
+      loading.value = false;
+    }
+  }
+};
+
+const handleSeed = async (type) => {
+  const count = seedCounts.value[type] || 0;
+  if (count <= 0) return showToast('Please enter a number greater than 0.', 'error');
+  if (confirm(`Are you sure you want to seed ${count} ${type}?`)) {
+    loading.value = true;
+    try {
+      const response = await axios.post(`/api/dev/seed/${type}`, { count });
+      showToast(response.data.message, "success");
+    } catch (error) {
+      showToast(`Error seeding ${type}. Check server logs.`, "error");
+    } finally {
+      loading.value = false;
+    }
+  }
+};
+
+const handleDelete = async (type) => {
+  if (confirm(`DANGER: Are you sure you want to delete ALL ${type}? This cannot be undone.`)) {
+    loading.value = true;
+    try {
+      const response = await axios.delete(`/api/dev/delete/${type}`);
+      showToast(response.data.message, "success");
+    } catch (error) {
+      showToast(`Error deleting ${type}. Check server logs.`, "error");
+    } finally {
+      loading.value = false;
+    }
+  }
+};
+
+const formatDate = (timestamp) => {
+  if (!timestamp) return "N/A";
+
+  // This check for `_seconds` will now correctly parse the date from your API.
+  if (timestamp._seconds) {
+    return new Date(timestamp._seconds * 1000).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  }
+
+  const date = new Date(timestamp);
+  if (isNaN(date.getTime())) {
+    return "Invalid Date";
+  }
+
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+onMounted(() => {
+  // If user data isn't in the store yet, the router guard should be fetching it.
+  // We just need to fetch the orders.
+  if (user.value) {
+    fetchOrders();
+  }
+
+  // return {
+  //   user,
+  //   formData,
+  //   orders,
+  //   loading,
+  //   updateProfile,
+  //   formatDate,
+  //   handleSeedDatabase,
+  // };
+});
 </script>
 
 <style scoped>
+/* Your existing styles are great, let's just add styles for the new button */
+.seed-btn {
+  background-color: #27ae60;
+  color: white;
+  width: 70%;
+  margin-top: 1rem; /* Add some space from the reset button */
+  padding: 0.75rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.seed-btn:hover {
+  background-color: #229954;
+}
+.seed-btn:disabled {
+  background-color: #ccc;
+}
+.admin-tools {
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  color: #721c24;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+.admin-tools h2 {
+  margin-top: 0;
+}
+.reset-btn {
+  background-color: #dc3545;
+  color: white;
+  width: 100%;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.reset-btn:hover {
+  background-color: #c82333;
+}
+.reset-btn:disabled {
+  background-color: #ccc;
+}
+
 .profile-container {
   padding: 2rem;
   max-width: 1200px;
@@ -467,6 +534,25 @@ export default {
 .view-order-btn:hover {
   background: #e9ecef;
 }
+
+.admin-panel { background: #fdf2f2; border: 1px solid #fbcaca; color: #58151c; border-radius: 8px; padding: 1.5rem; }
+.admin-panel h2 { margin-top: 0; display: flex; align-items: center; gap: 0.5rem; }
+.panel-section { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #fbcaca; }
+.action-item { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1rem; align-items: center; }
+.action-item input { padding: 0.5rem; border-radius: 4px; border: 1px solid #fbcaca; width: 80px; }
+.action-item button { flex-shrink: 0; }
+.delete-btn { background-color: #ef4444; color: white;   width: 100%;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;}
+.delete-btn:hover { background-color: #dc2626; }
 
 @media (max-width: 768px) {
   .profile-content {

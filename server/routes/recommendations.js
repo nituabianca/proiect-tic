@@ -1,6 +1,6 @@
 const express = require("express");
-const recommendationsController = require("../controllers/recommendationsController");
-const { verifyToken } = require("../middleware/auth.middleware");
+const recommendationsController = require("../controllers/recommendations");
+const { verifyToken } = require("../middlewares/auth");
 
 const router = express.Router();
 
