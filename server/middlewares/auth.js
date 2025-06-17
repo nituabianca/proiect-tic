@@ -1,3 +1,6 @@
+
+const orderService = require("../services/orders");
+
 const jwt = require("jsonwebtoken");
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -48,8 +51,35 @@ const isOwnerOrAdmin = (req, res, next) => {
   return res.status(403).json({ error: "Forbidden. You do not have permission to access this resource." });
 };
 
+const isOrderOwnerOrAdmin = async (req, res, next) => {
+  try {
+    if (req.user.role === 'admin') {
+      return next(); // Admins can access any order
+    }
+
+    const orderId = req.params.id;
+    const order = await orderService.getOrderById(orderId); // Use the service to get the order
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found." });
+    }
+    
+    // Check if the logged-in user's ID matches the order's userId
+    if (order.userId === req.user.id) {
+      return next();
+    }
+
+    return res.status(403).json({ error: "Forbidden. You do not have permission to access this order." });
+
+  } catch (error) {
+    console.error("Authorization Error in isOrderOwnerOrAdmin:", error);
+    return res.status(500).json({ error: "An error occurred during authorization." });
+  }
+};
+
 module.exports = {
   verifyToken,
   isAdmin,
   isOwnerOrAdmin,
+  isOrderOwnerOrAdmin,
 };
