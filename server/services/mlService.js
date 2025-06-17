@@ -1,334 +1,229 @@
 // backend/services/mlService.js
 const { db } = require("../firebase/firebase");
-const { getCache, setCache, deleteCache } = require("../utils/cache");
+const { getCache, setCache } = require("../utils/cache");
 
-// Cache TTLs (Time To Live) in milliseconds
-const USER_RATINGS_CACHE_TTL = 1 * 60 * 60 * 1000; // 1 hour
-const ALL_RATINGS_CACHE_TTL = 1 * 60 * 60 * 1000; // 1 hour
-const SIMILAR_USERS_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
-const SIMILAR_BOOKS_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
-const RECOMMENDATIONS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes (personal recommendations might change faster)
-const ALL_BOOKS_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours for all books data (used by getPopularBooks if applicable)
+const ML_CACHE_TTL = 6 * 3600 * 1000; // Cache ML results for 6 hours
 
-// --- Helper Functions to Fetch Ratings (with Caching) ---
+/**
+ * Gets popular books based on the number of ratings.
+ * This is a simple, non-personalized recommendation.
+ * @param {number} limit - The number of popular books to return.
+ * @returns {Promise<Array<object>>} A list of popular book objects.
+ */
+const getPopularBooks = async (limit = 10) => {
+  const cacheKey = `popular_books_${limit}`;
+  const cachedBooks = getCache(cacheKey);
+  if (cachedBooks) return cachedBooks;
 
-const getUserRatingsMap = async (userId) => {
-  const cacheKey = `user_ratings_map_${userId}`;
-  let ratingsMap = getCache(cacheKey);
-  if (ratingsMap) {
-    return ratingsMap;
+  try {
+    const snapshot = await db.collection("books")
+      .orderBy("numRatings", "desc")
+      .limit(limit)
+      .get();
+      
+    const books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setCache(cacheKey, books, ML_CACHE_TTL);
+    return books;
+  } catch (error) {
+    console.error("Error fetching popular books:", error);
+    return []; // Return empty on error
   }
-
-  const snapshot = await db
-    .collection("ratings")
-    .where("userId", "==", userId)
-    .get();
-  ratingsMap = {};
-  snapshot.forEach((doc) => {
-    const data = doc.data();
-    ratingsMap[data.bookId] = data.rating;
-  });
-  setCache(cacheKey, ratingsMap, USER_RATINGS_CACHE_TTL);
-  return ratingsMap;
 };
 
-const getAllRatings = async () => {
-  const cacheKey = `all_ratings`;
-  let allRatings = getCache(cacheKey);
-  if (allRatings) {
-    return allRatings;
-  }
+/**
+ * Gets recommendations using User-Based Collaborative Filtering.
+ * LOGIC: "Users who liked the same books as you also liked..."
+ * 1. Find the books the target user has rated highly (4+).
+ * 2. Find other users who have *also* rated those same books highly.
+ * 3. Aggregate all the *other* books that this group of "similar users" liked.
+ * 4. Return the most frequently liked books from that aggregate pool.
+ * @param {string} userId - The ID of the user to get recommendations for.
+ * @returns {Promise<Array<object>>} A list of recommended book objects.
+ */
+const getUserBasedRecommendations = async (userId, limit = 10) => {
+  const cacheKey = `user_based_recommendations_${userId}`;
+  const cachedRecs = getCache(cacheKey);
+  if (cachedRecs) return cachedRecs;
 
-  const snapshot = await db.collection("ratings").get();
-  allRatings = [];
-  snapshot.forEach((doc) => {
-    allRatings.push(doc.data());
-  });
-  setCache(cacheKey, allRatings, ALL_RATINGS_CACHE_TTL);
-  return allRatings;
-};
+  try {
+    // Step 1: Find books the user loves.
+    const userRatingsSnapshot = await db.collection("ratings")
+      .where("userId", "==", userId)
+      .where("rating", ">=", 4)
+      .get();
+    if (userRatingsSnapshot.empty) return [];
+    const lovedBookIds = userRatingsSnapshot.docs.map(doc => doc.data().bookId);
 
-const getAllUsersRatingsMap = async () => {
-  const allRatings = await getAllRatings();
-  const allUsersRatings = {}; // { userId: { bookId: rating, ... }, ... }
-  allRatings.forEach((rating) => {
-    if (!allUsersRatings[rating.userId]) {
-      allUsersRatings[rating.userId] = {};
-    }
-    allUsersRatings[rating.userId][rating.bookId] = rating.rating;
-  });
-  return allUsersRatings;
-};
+    // Step 2 & 3: Find similar users and aggregate their loved books.
+    const similarUsersRatingsSnapshot = await db.collection("ratings")
+      .where("bookId", "in", lovedBookIds)
+      .where("rating", ">=", 4)
+      .where("userId", "!=", userId) // Exclude the user themselves
+      .get();
+    
+    const potentialRecs = {}; // { bookId: count, ... }
+    similarUsersRatingsSnapshot.forEach(doc => {
+      const { bookId } = doc.data();
+      potentialRecs[bookId] = (potentialRecs[bookId] || 0) + 1;
+    });
 
-const getAllBooksRatingsMap = async () => {
-  const allRatings = await getAllRatings();
-  const allBooksRatings = {}; // { bookId: { userId: rating, ... }, ... }
-  allRatings.forEach((rating) => {
-    if (!allBooksRatings[rating.bookId]) {
-      allBooksRatings[rating.bookId] = {};
-    }
-    allBooksRatings[rating.bookId][rating.userId] = rating.rating;
-  });
-  return allBooksRatings;
-};
+    // Step 4: Sort by popularity among similar users and get book details.
+    const sortedRecIds = Object.keys(potentialRecs)
+      .sort((a, b) => potentialRecs[b] - potentialRecs[a]);
 
-// --- Similarity Calculation ---
-
-// Cosine Similarity between two rating vectors
-const calculateCosineSimilarity = (vec1, vec2) => {
-  const commonKeys = Object.keys(vec1).filter((key) =>
-    Object.prototype.hasOwnProperty.call(vec2, key)
-  );
-
-  if (commonKeys.length === 0) {
-    return 0; // No common items, similarity 0
-  }
-
-  let dotProduct = 0;
-  let magnitude1 = 0;
-  let magnitude2 = 0;
-
-  for (const key of commonKeys) {
-    dotProduct += vec1[key] * vec2[key];
-  }
-
-  for (const key of Object.keys(vec1)) {
-    magnitude1 += vec1[key] ** 2;
-  }
-  for (const key of Object.keys(vec2)) {
-    magnitude2 += vec2[key] ** 2;
-  }
-
-  magnitude1 = Math.sqrt(magnitude1);
-  magnitude2 = Math.sqrt(magnitude2);
-
-  if (magnitude1 === 0 || magnitude2 === 0) {
-    return 0;
-  }
-
-  return dotProduct / (magnitude1 * magnitude2);
-};
-
-// --- User-Based Collaborative Filtering ---
-
-const findSimilarUsers = async (targetUserId, topN = 5) => {
-  const cacheKey = `similar_users_${targetUserId}`;
-  let similarUsers = getCache(cacheKey);
-  if (similarUsers) {
-    return similarUsers;
-  }
-
-  const targetUserRatings = await getUserRatingsMap(targetUserId);
-  if (Object.keys(targetUserRatings).length === 0) {
-    setCache(cacheKey, [], SIMILAR_USERS_CACHE_TTL);
+    if (sortedRecIds.length === 0) return [];
+    
+    // Fetch book details for the top recommendations
+    const recsSnapshot = await db.collection("books")
+      .where(admin.firestore.FieldPath.documentId(), "in", sortedRecIds.slice(0, limit))
+      .get();
+      
+    const recommendations = recsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    setCache(cacheKey, recommendations, ML_CACHE_TTL);
+    return recommendations;
+  } catch (error) {
+    console.error(`Error in getUserBasedRecommendations for ${userId}:`, error);
     return [];
   }
-
-  const allUsersRatings = await getAllUsersRatingsMap();
-  const similarities = [];
-
-  for (const userId of Object.keys(allUsersRatings)) {
-    if (userId === targetUserId) continue;
-
-    const similarity = calculateCosineSimilarity(
-      targetUserRatings,
-      allUsersRatings[userId]
-    );
-    if (similarity > 0) {
-      similarities.push({ userId, similarity });
-    }
-  }
-
-  similarities.sort((a, b) => b.similarity - a.similarity);
-  similarUsers = similarities.slice(0, topN);
-  setCache(cacheKey, similarUsers, SIMILAR_USERS_CACHE_TTL);
-  return similarUsers;
 };
 
-const getUserBasedRecommendations = async (
-  targetUserId,
-  numRecommendations = 5
-) => {
-  const cacheKey = `user_based_recommendations_${targetUserId}_${numRecommendations}`; // Include num in cache key
-  let cachedRecs = getCache(cacheKey);
+**
+ * Gets recommendations using Item-Based Collaborative Filtering.
+ * LOGIC: "If you liked these specific books, you might also like these other books that are often enjoyed by the same people."
+ * 1. Find the books the target user has rated highly (the "seed" set).
+ * 2. Find all *other users* who also rated any of those seed books highly.
+ * 3. Look at all the *other* books this "fellow fan" group rated highly.
+ * 4. Aggregate these other books, rank them by how many fellow fans liked them, and return the top results.
+ * @param {string} userId The user to get recommendations for.
+ * @returns {Promise<Array<object>>} A list of recommended book objects.
+ */
+const getItemBasedRecommendations = async (userId, limit = 10) => {
+  const cacheKey = `item_based_recommendations_${userId}`;
+  const cachedRecs = getCache(cacheKey);
   if (cachedRecs) {
+    console.log(`[Cache] HIT for item-based recs: ${userId}`);
     return cachedRecs;
   }
+  console.log(`[Cache] MISS for item-based recs: ${userId}. Calculating...`);
 
-  const similarUsers = await findSimilarUsers(targetUserId, 10);
-  if (similarUsers.length === 0) {
-    setCache(cacheKey, [], RECOMMENDATIONS_CACHE_TTL);
-    return [];
-  }
+  try {
+    // Step 1: Get user's highly-rated "seed" books
+    const userRatingsSnapshot = await db.collection("ratings").where("userId", "==", userId).where("rating", ">=", 4).get();
+    if (userRatingsSnapshot.empty) return [];
+    const seedBookIds = userRatingsSnapshot.docs.map(doc => doc.data().bookId);
 
-  const targetUserRatings = await getUserRatingsMap(targetUserId);
-  const recommendedBookScores = {};
+    // Step 2: Find "fellow fans"
+    const fellowFansSnapshot = await db.collection("ratings").where("bookId", "in", seedBookIds).where("rating", ">=", 4).get();
+    const fellowFanIds = [...new Set(fellowFansSnapshot.docs.map(doc => doc.data().userId))];
 
-  for (const { userId: similarUserId, similarity } of similarUsers) {
-    const similarUserRatings = await getUserRatingsMap(similarUserId);
-    for (const bookId of Object.keys(similarUserRatings)) {
-      if (!Object.prototype.hasOwnProperty.call(targetUserRatings, bookId)) {
-        if (!recommendedBookScores[bookId]) {
-          recommendedBookScores[bookId] = 0;
-        }
-        recommendedBookScores[bookId] +=
-          similarUserRatings[bookId] * similarity;
+    // Step 3 & 4: Discover, aggregate, and filter what fellow fans liked
+    if (fellowFanIds.length === 0) return [];
+    const recsSnapshot = await db.collection("ratings").where("userId", "in", fellowFanIds).where("rating", ">=", 4).get();
+    
+    const potentialRecs = {};
+    recsSnapshot.forEach(doc => {
+      const { bookId } = doc.data();
+      // Crucially, filter out books the user has already rated/read
+      if (!seedBookIds.includes(bookId)) {
+        potentialRecs[bookId] = (potentialRecs[bookId] || 0) + 1;
       }
-    }
-  }
+    });
 
-  const sortedRecommendedBookIds = Object.entries(recommendedBookScores)
-    .sort(([, scoreA], [, scoreB]) => scoreB - scoreA)
-    .map(([bookId]) => bookId);
+    const sortedRecIds = Object.keys(potentialRecs).sort((a, b) => potentialRecs[b] - potentialRecs[a]);
+    if (sortedRecIds.length === 0) return [];
 
-  const recommendedBooksDetails = [];
-  for (const bookId of sortedRecommendedBookIds) {
-    if (recommendedBooksDetails.length >= numRecommendations) break;
-    const bookDoc = await db.collection("books").doc(bookId).get();
-    if (bookDoc.exists) {
-      recommendedBooksDetails.push({ id: bookDoc.id, ...bookDoc.data() });
-    }
-  }
-  setCache(cacheKey, recommendedBooksDetails, RECOMMENDATIONS_CACHE_TTL);
-  return recommendedBooksDetails;
-};
-
-// --- Item-Based Collaborative Filtering ---
-
-const findSimilarBooks = async (targetBookId, topN = 5) => {
-  const cacheKey = `similar_books_${targetBookId}_${topN}`; // Include topN in cache key
-  let similarBooks = getCache(cacheKey);
-  if (similarBooks) {
-    return similarBooks;
-  }
-
-  const allBooksRatings = await getAllBooksRatingsMap();
-  const targetBookRatings = allBooksRatings[targetBookId];
-
-  if (!targetBookRatings || Object.keys(targetBookRatings).length === 0) {
-    setCache(cacheKey, [], SIMILAR_BOOKS_CACHE_TTL);
+    // Step 5: Fetch book data for top recommendations
+    const booksSnapshot = await db.collection("books").where(admin.firestore.FieldPath.documentId(), "in", sortedRecIds.slice(0, limit * 2)).get();
+    const recommendations = booksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).slice(0, limit);
+    
+    setCache(cacheKey, recommendations, ML_CACHE_TTL);
+    return recommendations;
+  } catch (error) {
+    console.error(`Error in getItemBasedRecommendations for ${userId}:`, error);
     return [];
   }
-
-  const similarities = [];
-  for (const bookId of Object.keys(allBooksRatings)) {
-    if (bookId === targetBookId) continue;
-
-    const similarity = calculateCosineSimilarity(
-      targetBookRatings,
-      allBooksRatings[bookId]
-    );
-    if (similarity > 0) {
-      similarities.push({ bookId, similarity });
-    }
-  }
-
-  similarities.sort((a, b) => b.similarity - a.similarity);
-  similarBooks = similarities.slice(0, topN);
-  setCache(cacheKey, similarBooks, SIMILAR_BOOKS_CACHE_TTL);
-  return similarBooks;
 };
 
-const getItemBasedRecommendations = async (
-  targetUserId,
-  numRecommendations = 5
-) => {
-  const cacheKey = `item_based_recommendations_${targetUserId}_${numRecommendations}`; // Include num in cache key
-  let cachedRecs = getCache(cacheKey);
-  if (cachedRecs) {
-    return cachedRecs;
-  }
+/**
+ * Gets recommendations using Content-Based Filtering.
+ * LOGIC: "Since you are looking at Book X, here are other books with the same genre and by the same author."
+ * This is perfect for a "More Like This" section on a book detail page.
+ * @param {string} bookId The ID of the book to find similarities for.
+ * @returns {Promise<Array<object>>} A list of similar book objects.
+ */
+const getContentBasedSimilarities = async (bookId, limit = 5) => {
+  const cacheKey = `content_based_similarities_${bookId}`;
+  const cachedRecs = getCache(cacheKey);
+  if (cachedRecs) return cachedRecs;
 
-  const userRatings = await getUserRatingsMap(targetUserId);
-  if (Object.keys(userRatings).length === 0) {
-    setCache(cacheKey, [], RECOMMENDATIONS_CACHE_TTL);
+  try {
+    const bookDoc = await db.collection("books").doc(bookId).get();
+    if (!bookDoc.exists) return [];
+    const { genre, author } = bookDoc.data();
+
+    // Find books with the same genre, excluding the source book itself
+    const genreSnapshot = await db.collection("books")
+      .where("genre", "==", genre)
+      .where(admin.firestore.FieldPath.documentId(), "!=", bookId)
+      .limit(limit)
+      .get();
+    
+    const similarBooks = {};
+    genreSnapshot.docs.forEach(doc => {
+      similarBooks[doc.id] = { id: doc.id, ...doc.data() };
+    });
+
+    // Try to find more books by the same author to enrich the list
+    if (Object.keys(similarBooks).length < limit) {
+      const authorSnapshot = await db.collection("books")
+        .where("author", "==", author)
+        .where(admin.firestore.FieldPath.documentId(), "!=", bookId)
+        .limit(limit)
+        .get();
+      authorSnapshot.docs.forEach(doc => {
+        similarBooks[doc.id] = { id: doc.id, ...doc.data() };
+      });
+    }
+
+    const recommendations = Object.values(similarBooks).slice(0, limit);
+    setCache(cacheKey, recommendations, ML_CACHE_TTL);
+    return recommendations;
+  } catch (error) {
+    console.error(`Error in getContentBasedSimilarities for ${bookId}:`, error);
     return [];
   }
-
-  const recommendedBookScores = {};
-
-  for (const ratedBookId of Object.keys(userRatings)) {
-    const userRatingForBook = userRatings[ratedBookId];
-    const similarBooks = await findSimilarBooks(ratedBookId, 5); // Fetch a few similar books
-
-    for (const { bookId: similarBookId, similarity } of similarBooks) {
-      if (!Object.prototype.hasOwnProperty.call(userRatings, similarBookId)) {
-        if (!recommendedBookScores[similarBookId]) {
-          recommendedBookScores[similarBookId] = 0;
-        }
-        recommendedBookScores[similarBookId] += userRatingForBook * similarity;
-      }
-    }
-  }
-
-  const sortedRecommendedBookIds = Object.entries(recommendedBookScores)
-    .sort(([, scoreA], [, scoreB]) => scoreB - scoreA)
-    .map(([bookId]) => bookId);
-
-  const recommendedBooksDetails = [];
-  for (const bookId of sortedRecommendedBookIds) {
-    if (recommendedBooksDetails.length >= numRecommendations) break;
-    const bookDoc = await db.collection("books").doc(bookId).get();
-    if (bookDoc.exists) {
-      recommendedBooksDetails.push({ id: bookDoc.id, ...bookDoc.data() });
-    }
-  }
-  setCache(cacheKey, recommendedBooksDetails, RECOMMENDATIONS_CACHE_TTL);
-  return recommendedBooksDetails;
 };
 
-// --- Other potential algorithms (Conceptual/Future) ---
+/**
+ * Gets recently added, high-quality books. A simple proxy for "trending".
+ * @param {number} limit The number of books to return.
+ * @returns {Promise<Array<object>>} A list of new release book objects.
+ */
+const getNewReleases = async (limit = 10) => {
+  const cacheKey = `new_releases_${limit}`;
+  const cachedBooks = getCache(cacheKey);
+  if (cachedBooks) return cachedBooks;
 
-const getPopularBooks = async (num = 5) => {
-  const cacheKey = `popular_books_${num}`;
-  let popularBooks = getCache(cacheKey);
-  if (popularBooks) {
-    return popularBooks;
+  try {
+    const snapshot = await db.collection("books")
+      .orderBy("createdAt", "desc")
+      .limit(limit)
+      .get();
+
+    const books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setCache(cacheKey, books, 24 * 3600 * 1000); // Cache new releases for a full day
+    return books;
+  } catch (error) {
+    console.error("Error fetching new releases:", error);
+    return [];
   }
-
-  // Assuming 'averageRating' and 'numRatings' fields exist on books
-  const snapshot = await db
-    .collection("books")
-    .orderBy("numRatings", "desc") // Or based on averageRating, or a combination
-    .limit(num)
-    .get();
-  popularBooks = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-  setCache(cacheKey, popularBooks, ALL_BOOKS_CACHE_TTL);
-  return popularBooks;
-};
-
-const getTrendingBooks = async (num = 5) => {
-  const cacheKey = `trending_books_${num}`;
-  let trendingBooks = getCache(cacheKey);
-  if (trendingBooks) {
-    return trendingBooks;
-  }
-
-  // This is a placeholder for trending. A true trending algorithm would involve:
-  // - Tracking recent views, purchases, or new ratings.
-  // - Weighting recent activity higher.
-  // For this example, we'll sort recently added books by their average rating.
-  const snapshot = await db
-    .collection("books")
-    .orderBy("createdAt", "desc") // Assuming a 'createdAt' timestamp field
-    .limit(num * 2) // Fetch a few more to filter/sort
-    .get();
-
-  trendingBooks = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-
-  // Refine trending: filter out books with no ratings, sort by averageRating
-  trendingBooks = trendingBooks
-    .filter((book) => book.averageRating > 0) // Only show rated books as trending
-    .sort((a, b) => b.averageRating - a.averageRating)
-    .slice(0, num); // Take the top 'num' after sorting
-
-  setCache(cacheKey, trendingBooks, RECOMMENDATIONS_CACHE_TTL); // Trending changes faster, so a shorter TTL
-  return trendingBooks;
 };
 
 module.exports = {
+  getPopularBooks,
+  getNewReleases,
   getUserBasedRecommendations,
   getItemBasedRecommendations,
-  getPopularBooks,
-  getTrendingBooks,
+  getContentBasedSimilarities,
 };
