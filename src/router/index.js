@@ -26,17 +26,12 @@ const routes = [
     component: RegisterPage,
     meta: { requiresAuth: false },
   },
-  {
-    path: "/verify-email",
-    name: "VerifyEmail",
-    component: VerifyEmailPage,
-    meta: { requiresAuth: false },
-  },
+
   {
     path: "/books",
     name: "Books",
     component: BooksPage,
-    meta: { requiresAuth: false },
+    meta: { requiresAuth: true },
   },
   {
     path: "/dashboard",
@@ -76,13 +71,16 @@ const routes = [
   },
   {
     path: "/",
-    redirect: "/books",
+    name: "Home",
+    component: LandingPage,
+    meta:{requiresAuth: false},
   },
   {
     path: "/:pathMatch(.*)*",
     name: "NotFound",
-    redirect: "/books",
+    redirect: "/",
   },
+  
 ];
 
 const router = createRouter({
