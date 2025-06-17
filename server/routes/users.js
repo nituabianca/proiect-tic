@@ -1,21 +1,23 @@
 const express = require("express");
-const userController = require("../controllers/users");
-const authMiddleware = require("../middlewares/auth");
-const adminMiddleware = require("../middlewares/admin");
-const userMiddleware = require("../middlewares/user"); // Correct import path
+const userController = require("../controllers/user"); // Correct controller name
+const { verifyToken, isAdmin, isOwnerOrAdmin } = require("../middleware/auth");
 
 const router = express.Router();
 
-// Admin-only routes
-router.get("/", authMiddleware, adminMiddleware, userController.getAllUsers);
-router.get("/:id", authMiddleware, adminMiddleware, userController.getUserById);
-router.delete(
-  "/:id",
-  authMiddleware,
-  adminMiddleware,
-  userController.deleteUser
-);
-// User-specific routes (user can only update their own profile)
-router.put("/:id", authMiddleware, userMiddleware, userController.updateUser); // Correctly uses userMiddleware for self-access/admin access
+// --- ADMIN ONLY ROUTES ---
+// Get a list of all users
+router.get("/", [verifyToken, isAdmin], userController.getAllUsers);
+
+// Delete any user
+router.delete("/:id", [verifyToken, isAdmin], userController.deleteUser);
+
+
+// --- OWNER OR ADMIN ROUTES ---
+// Get a specific user's profile (either your own, or any user if you're an admin)
+router.get("/:id", [verifyToken, isOwnerOrAdmin], userController.getUserById);
+
+// Update a specific user's profile (either your own, or any user if you're an admin)
+router.put("/:id", [verifyToken, isOwnerOrAdmin], userController.updateUser);
+
 
 module.exports = router;
