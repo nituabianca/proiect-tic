@@ -1,31 +1,50 @@
-// backend/services/ratingService.js
-const { db } = require("../firebase/firebase");
-const { deleteCache } = require("../utils/cache"); // Make sure this is imported if not already
-const statisticsService = require("./statistics"); // Import statisticsService
+const { db, admin } = require("../firebase/firebase");
+const { deleteCache } = require("../utils/cache");
+const statisticsService = require("./statistics"); // Standardized name
+const bookService = require("./books"); // Import bookService to check for book existence
 
 const addOrUpdateBookRating = async (userId, bookId, rating, reviewText) => {
-  try {
-    const ratingRef = db.collection("ratings").doc(`${userId}_${bookId}`); // Unique ID for user-book rating
-    const ratingData = {
-      userId,
-      bookId,
-      rating: parseFloat(rating), // Ensure rating is a number
-      reviewText: reviewText || null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    await ratingRef.set(ratingData, { merge: true }); // Use merge to update if exists
-
-    // After adding/updating a rating, recalculate average for the user and book
-    await statisticsService.calculateAndSetAverageRating(userId);
-    await statisticsService.calculateAndSetBookAverageRating(bookId); // New function to calculate book's average
-
-    return { id: ratingRef.id, ...ratingData };
-  } catch (error) {
-    console.error("Error adding or updating book rating:", error);
-    throw new Error("Failed to add or update book rating");
+  // 1. Validate that the book exists before doing anything else.
+  const book = await bookService.getBookById(bookId);
+  if (!book) {
+    const error = new Error("Book not found.");
+    error.statusCode = 404;
+    throw error;
   }
+
+  const ratingRef = db.collection("ratings").doc(`${userId}_${bookId}`);
+  const ratingData = {
+    userId,
+    bookId,
+    rating: parseFloat(rating),
+    reviewText: reviewText || null,
+    // Using server timestamps for reliability
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  // 2. Set the rating
+  await ratingRef.set(ratingData, { merge: true });
+
+  // 3. Trigger statistics recalculation (this is a great pattern)
+  // These can run in parallel without waiting for each other.
+  const userStatsPromise = statisticsService.calculateAndSetAverageRating(userId);
+  const bookStatsPromise = statisticsService.calculateAndSetBookAverageRating(bookId);
+  await Promise.all([userStatsPromise, bookStatsPromise]);
+
+  // 4. Invalidate all relevant caches. This is the single source of truth for this side effect.
+  console.log(`Invalidating caches for rating update: user ${userId}, book ${bookId}`);
+  deleteCache(`user_ratings_map_${userId}`);
+  deleteCache(`all_ratings`);
+  deleteCache(`user_based_recommendations_${userId}`);
+  deleteCache(`item_based_recommendations_${userId}`);
+  deleteCache(`similar_users_${userId}`);
+  deleteCache(`similar_books_${bookId}`);
+  deleteCache(`user_statistics_${userId}`);
+  deleteCache(`book_statistics_${bookId}`);
+  deleteCache("popular_books_10"); // Use a consistent key
+
+  return { id: ratingRef.id, ...ratingData };
 };
 
 const getUserRatings = async (userId) => {
