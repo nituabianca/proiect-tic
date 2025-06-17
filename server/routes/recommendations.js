@@ -4,7 +4,10 @@ const { verifyToken } = require("../middleware/auth.middleware");
 
 const router = express.Router();
 
-// A logged-in user gets their own personalized list of recommendations.
+// Personalized recommendations for the logged-in user's homepage.
 router.get("/", verifyToken, recommendationsController.getRecommendations);
+
+// Public route to get books similar to a specific book (for "More Like This").
+router.get("/similar-to/:bookId", recommendationsController.getSimilarBooks);
 
 module.exports = router;
