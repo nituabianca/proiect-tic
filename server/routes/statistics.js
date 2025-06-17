@@ -1,14 +1,22 @@
 const express = require("express");
 const statisticsController = require("../controllers/statistics");
-const authMiddleware = require("../middlewares/auth");
+const { verifyToken, isAdmin } = require("../middleware/auth");
 
 const router = express.Router();
 
-router.get("/my-stats", authMiddleware, statisticsController.getUserStatistics); // Correct
+// --- Public Route ---
+// Anyone can get the basic statistics for a book.
+router.get("/books/:bookId", statisticsController.getBookStatistics);
 
-// NOUĂ RUTĂ: Oricine poate obține statisticile unei cărți
-router.get("/books/:bookId", statisticsController.getBookStatistics); // Public access - Correct
-// Dacă vrei să fie protejată de admin:
-// router.get('/books/:bookId', authMiddleware, adminMiddleware, statisticsController.getBookStatistics); // (Commented out, but correct usage if enabled)
+
+// --- Authenticated User Route ---
+// A logged-in user can get their own detailed statistics.
+router.get("/my-stats", verifyToken, statisticsController.getUserStatistics);
+
+
+// --- Example Admin Route ---
+// An admin could potentially get site-wide statistics.
+router.get("/site-overview", [verifyToken, isAdmin], statisticsController.getSiteOverview);
+
 
 module.exports = router;
