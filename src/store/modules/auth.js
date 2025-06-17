@@ -67,72 +67,28 @@ const mutations = {
 };
 
 const actions = {
-  async register({ commit }, { firstName, lastName, email, password }) {
+async register({ commit, dispatch }, { firstName, lastName, email, password }) {
     commit("SET_LOADING", true);
     commit("SET_ERROR", null);
     try {
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      const firebaseUser = userCredential.user;
-
-      // Update Firebase user's profile with first/last name
-      // This is on the Firebase Auth user object, not Firestore
-      await updateProfile(firebaseUser, {
-        displayName: `${firstName} ${lastName}`,
-      });
-      console.log(
-        "FRONTEND (Vuex Register): Firebase Auth user created and profile updated."
-      );
-
-      const idToken = await firebaseUser.getIdToken();
-      console.log(
-        "FRONTEND (Vuex Register): Newly acquired Firebase ID Token for backend registration:",
-        idToken
-      );
-
-      // Send Firebase ID Token to your backend's register endpoint
-      // The backend will create the Firestore profile and issue your custom JWT
+      // 1. Call OUR backend API directly. It will handle creating the user.
+      // We no longer use the Firebase Client SDK's createUserWithEmailAndPassword here.
       const response = await axios.post("/api/auth/register", {
-        email: email,
-        firstName: firstName,
-        lastName: lastName,
-        // No need to send idToken here if backend handles it upon creation from firebaseUser.uid
-        // or if it expects a separate login post-registration for token exchange.
-        // Based on your backend, you were sending idToken from Firebase login to backend /api/auth/login.
-        // For /api/auth/register, the backend directly calls admin.auth().createUser.
-        // So, idToken is likely not needed for *this specific backend register endpoint*.
-        // If your backend /api/auth/register route *does* expect it, then re-add idToken: idToken,
-        // But the previous backend controller didn't use it for register.
+        email,
+        password,
+        firstName,
+        lastName,
       });
 
-      // Commit state changes with the custom JWT and user data from backend
-      commit("SET_USER", response.data.user); // Backend response should include user object with role
+      // 2. Our backend, upon successful registration, returns our custom JWT and user object.
+      // We commit this to the store immediately.
+      commit("SET_USER", response.data.user);
       commit("SET_TOKEN", response.data.token);
 
       return response.data;
     } catch (error) {
-      console.error("Vuex Register Error:", error);
-      let errorMessage = "Registration failed. An unexpected error occurred.";
-      if (error.code) {
-        switch (error.code) {
-          case "auth/email-already-in-use":
-            errorMessage = "Email is already registered.";
-            break;
-          case "auth/invalid-email":
-            errorMessage = "Please enter a valid email address.";
-            break;
-          case "auth/weak-password":
-            errorMessage = "Password is too weak (min 6 characters).";
-            break;
-          default:
-            errorMessage = `Registration failed. (${error.code})`;
-        }
-      } else if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      }
+      // Error handling remains largely the same.
+      const errorMessage = error.response?.data?.error || "Registration failed.";
       commit("SET_ERROR", errorMessage);
       throw new Error(errorMessage);
     } finally {
