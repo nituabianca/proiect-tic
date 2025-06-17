@@ -1,18 +1,22 @@
 const express = require("express");
 const ratingController = require("../controllers/rating");
-const authMiddleware = require("../middlewares/auth");
-// const adminMiddleware = require('../middleware/adminMiddleware'); // Posibil să nu fie necesar aici
+const { verifyToken, isOwnerOrAdmin } = require("../middleware/auth");
 
 const router = express.Router();
 
-// Authenticated user can add/update their own rating for a book
-router.post("/:bookId", authMiddleware, ratingController.addOrUpdateRating);
-router.put("/:bookId", authMiddleware, ratingController.addOrUpdateRating); // PUT for update, POST for add
+// --- Public Route ---
+// Anyone can view the ratings for a specific book.
+router.get("/book/:bookId", ratingController.getRatingsForBook);
 
-// Oricine poate vedea rating-urile unei cărți
-router.get("/:bookId", ratingController.getRatingsForBook); // Public access - Correct
 
-// Userul își poate vedea ratingurile (sau adminul pe ale altcuiva)
-router.get("/user/:userId", authMiddleware, ratingController.getUserRatings); // Correctly protected
+// --- Authenticated User Routes ---
+
+// A logged-in user can add or update their own rating for a book.
+// Using PUT for consistency, as the service handles both create and update.
+router.put("/book/:bookId", verifyToken, ratingController.addOrUpdateRating);
+
+// A user can get their own ratings, or an admin can get any user's ratings.
+// Our isOwnerOrAdmin middleware is perfect for this.
+router.get("/user/:userId", [verifyToken, isOwnerOrAdmin], ratingController.getUserRatings);
 
 module.exports = router;
