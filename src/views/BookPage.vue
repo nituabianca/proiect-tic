@@ -150,7 +150,7 @@
                   Add to Cart
                 </button>
               </div>
-              <div class="book-genre">Genre: {{ book.category?.genre }}</div>
+              <div class="book-genre">Genre: {{ book.genre }}</div>
             </div>
           </div>
         </div>
