@@ -20,6 +20,59 @@ const queryBookById = async (id) => {
   }
 };
 
+/**
+ * Fetches a paginated and/or filtered list of books.
+ * @param {object} options
+ * @param {number} [options.limit=12] - The number of books per page.
+ * @param {string|null} [options.startAfterId=null] - The cursor for pagination.
+ * @param {object} [options.filters={}] - An object with filter criteria.
+ * @returns {Promise<{books: Array<object>, nextCursor: string|null}>}
+ */
+const getBooks = async ({ limit = 12, startAfterId = null, filters = {} }) => {
+  try {
+    let query = db.collection("books");
+
+    // --- Apply Filters ---
+    // Note: Firestore requires creating indexes for most compound queries.
+    // You will be prompted in the firebase console error logs with a link to create them.
+    if (filters.genre) {
+      query = query.where("genre", "==", filters.genre);
+    }
+    if (filters.search) {
+      // This is a "starts with" search, which is the most common for Firestore without a third-party service.
+      query = query.orderBy("title")
+                   .where("title", ">=", filters.search)
+                   .where("title", "<=", filters.search + "\uf8ff");
+    }
+
+    // --- Apply Sorting ---
+    // You must order by the field you use for inequality filters. If no search, we can sort by another field.
+    if (!filters.search) {
+      query = query.orderBy("createdAt", "desc"); // Default sort for admin panel could be newest first
+    }
+    
+    // --- Apply Pagination ---
+    if (startAfterId) {
+      const startAfterDoc = await db.collection("books").doc(startAfterId).get();
+      if (startAfterDoc.exists) {
+        query = query.startAfter(startAfterDoc);
+      }
+    }
+
+    const snapshot = await query.limit(limit).get();
+    const books = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+    // --- Determine Next Cursor ---
+    const lastVisibleDoc = snapshot.docs[snapshot.docs.length - 1];
+    const nextCursor = books.length < limit ? null : lastVisibleDoc?.id || null;
+
+    return { books, nextCursor };
+  } catch (error) {
+    console.error("Error fetching paginated/filtered books:", error);
+    throw new Error("Failed to fetch books");
+  }
+};
+
 const getAllBooks = async () => {
   try {
     const cacheKey = `all_books`;
@@ -206,6 +259,7 @@ const updateBookStock = async (id, quantity) => {
 
 module.exports = {
   queryBookById,
+  getBooks,
   getAllBooks,
   getReadBookIdsByUserId,
   createBook, // Export new functions
