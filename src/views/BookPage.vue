@@ -26,6 +26,10 @@
             />
             <h4 class="book-title-small">{{ book.title }}</h4>
             <p class="book-author-small">{{ book.author }}</p>
+            <div class="rating-container-small">
+              <StarRating :rating="book.averageRating" />
+              <span class="num-ratings-small">({{ book.numRatings }})</span>
+            </div>
             <span class="book-price-small">${{ book.price.toFixed(2) }}</span>
             <button @click="addToCart(book)" class="add-to-cart-btn-small">
               Add
@@ -72,6 +76,10 @@
             />
             <h4 class="book-title-small">{{ book.title }}</h4>
             <p class="book-author-small">{{ book.author }}</p>
+              <div class="rating-container">
+                <StarRating :rating="book.averageRating" />
+                <span class="num-ratings-small">({{ book.numRatings }} ratings)</span>
+              </div>
             <span class="book-price-small">${{ book.price.toFixed(2) }}</span>
             <button @click="addToCart(book)" class="add-to-cart-btn-small">
               Add
@@ -106,6 +114,10 @@
             />
             <h4 class="book-title-small">{{ book.title }}</h4>
             <p class="book-author-small">{{ book.author }}</p>
+            <div class="rating-container-small">
+              <StarRating :rating="book.averageRating" />
+              <span class="num-ratings-small">({{ book.numRatings }})</span>
+            </div>
             <span class="book-price-small">${{ book.price.toFixed(2) }}</span>
             <button @click="addToCart(book)" class="add-to-cart-btn-small">
               Add
@@ -138,6 +150,10 @@
             <div class="book-details">
               <h3 class="book-title">{{ book.title }}</h3>
               <p class="book-author">{{ book.author }}</p>
+              <div class="rating-container">
+                <StarRating :rating="book.averageRating" />
+                <span class="num-ratings">({{ book.numRatings }} ratings)</span>
+              </div>
               <div class="book-pricing">
                 <span class="book-price">${{ book.price.toFixed(2) }}</span>
                 <span
@@ -174,6 +190,7 @@
 
 <script>
 /* eslint-disable */
+import StarRating from '@/components/StarRating.vue';
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useStore } from "vuex";
 import axios from "axios";
@@ -726,5 +743,26 @@ onUnmounted(() => {
     right: 1rem;
     padding: 0.8rem;
   }
+  .rating-container-small {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.num-ratings-small {
+  font-size: 0.75rem;
+  color: #7f8c8d;
+}
+
+.rating-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 1rem;
+}
+.num-ratings {
+  font-size: 0.9rem;
+  color: #7f8c8d;
+}
 }
 </style>
