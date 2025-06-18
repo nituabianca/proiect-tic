@@ -33,7 +33,11 @@
       <h2 class="section-title">Popular With Our Readers</h2>
       <div class="books-carousel">
         <div v-for="book in popularBooks" :key="book.id" class="book-card-small">
-          <img :src="book.coverImageUrl" :alt="book.title" class="book-cover-small" @error="handleImageError" />
+          <img
+            :src="`https://picsum.photos/seed/${book.id}/150/200`"
+            :alt="book.title"
+            class="book-cover-small"
+          />
           <h4 class="book-title-small">{{ book.title }}</h4>
           <p class="book-author-small">{{ book.author }}</p>
         </div>

@@ -148,11 +148,10 @@ const getItemBasedRecommendations = async (userId, limit = 10) => {
 
 /**
  * Gets recommendations using Content-Based Filtering.
- * LOGIC: "Since you are looking at Book X, here are other books with the same genre and by the same author."
- * This is perfect for a "More Like This" section on a book detail page.
+ * CORRECTED: This version works around Firestore's query limitations.
  * @param {string} bookId The ID of the book to find similarities for.
- * @param limit
- * @returns {Promise<Array<object>>} A list of similar book objects.
+ * @param {number} limit The number of similar books to return.
+ * @returns {Promise<Array<object>>}
  */
 const getContentBasedSimilarities = async (bookId, limit = 5) => {
   const cacheKey = `content_based_similarities_${bookId}`;
@@ -162,33 +161,24 @@ const getContentBasedSimilarities = async (bookId, limit = 5) => {
   try {
     const bookDoc = await db.collection("books").doc(bookId).get();
     if (!bookDoc.exists) return [];
-    const { genre, author } = bookDoc.data();
+    const { genre } = bookDoc.data();
 
-    // Find books with the same genre, excluding the source book itself
-    const genreSnapshot = await db.collection("books")
+    // THE FIX: We fetch one more than we need (limit + 1).
+    const snapshot = await db.collection("books")
       .where("genre", "==", genre)
-      .where(admin.firestore.FieldPath.documentId(), "!=", bookId)
-      .limit(limit)
+      .limit(limit + 1)
       .get();
-    
-    const similarBooks = {};
-    genreSnapshot.docs.forEach(doc => {
-      similarBooks[doc.id] = { id: doc.id, ...doc.data() };
+
+    const similarBooks = [];
+    snapshot.forEach(doc => {
+      // We then filter out the original book in our code.
+      if (doc.id !== bookId) {
+        similarBooks.push({ id: doc.id, ...doc.data() });
+      }
     });
 
-    // Try to find more books by the same author to enrich the list
-    if (Object.keys(similarBooks).length < limit) {
-      const authorSnapshot = await db.collection("books")
-        .where("author", "==", author)
-        .where(admin.firestore.FieldPath.documentId(), "!=", bookId)
-        .limit(limit)
-        .get();
-      authorSnapshot.docs.forEach(doc => {
-        similarBooks[doc.id] = { id: doc.id, ...doc.data() };
-      });
-    }
-
-    const recommendations = Object.values(similarBooks).slice(0, limit);
+    // We ensure we only return the number of books requested.
+    const recommendations = similarBooks.slice(0, limit);
     setCache(cacheKey, recommendations, ML_CACHE_TTL);
     return recommendations;
   } catch (error) {

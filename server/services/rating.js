@@ -28,8 +28,8 @@ const addOrUpdateBookRating = async (userId, bookId, rating, reviewText) => {
 
   // 3. Trigger statistics recalculation (this is a great pattern)
   // These can run in parallel without waiting for each other.
-  const userStatsPromise = statisticsService.calculateAndSetAverageRating(userId);
-  const bookStatsPromise = statisticsService.calculateAndSetBookAverageRating(bookId);
+  const userStatsPromise = statisticsService.updateUserRatingStats(userId);
+  const bookStatsPromise = statisticsService.updateBookRatingStats(bookId);
   await Promise.all([userStatsPromise, bookStatsPromise]);
 
   // 4. Invalidate all relevant caches. This is the single source of truth for this side effect.
