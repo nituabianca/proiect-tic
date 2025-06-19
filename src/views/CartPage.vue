@@ -23,7 +23,6 @@
                 :src="`https://picsum.photos/seed/${book.id}/150/200`"
                 :alt="book.title"
                 class="book-cover-small"
-                @error="handleImageErrorSmall"
               />
               <div class="item-details">
                 <h4 class="item-title">{{ item.title }}</h4>
