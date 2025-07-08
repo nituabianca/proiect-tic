@@ -19,7 +19,11 @@
         <div class="cart-items-list">
           <div v-for="item in items" :key="item.id" class="cart-item-card">
             <div class="item-main-info">
-              <img :src="item.coverImageUrl" :alt="item.title" class="item-cover" @error="handleImageError"/>
+              <img
+                :src="`https://picsum.photos/seed/${book.id}/150/200`"
+                :alt="book.title"
+                class="book-cover-small"
+              />
               <div class="item-details">
                 <h4 class="item-title">{{ item.title }}</h4>
                 <p class="item-author">{{ item.author }}</p>
