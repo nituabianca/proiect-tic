@@ -45,18 +45,56 @@ const registerUser = async (email, password, firstName, lastName) => {
   });
 
   // 2. Use our helper as a template for a consistent Firestore document.
-  const newUserTemplate = generateMockUser();
-
-  // 3. Populate the user document with real data.
+  // const newUserTemplate = generateMockUser();
   const userData = {
-    ...newUserTemplate,
-    email: email.toLowerCase(),
-    firstName,
-    lastName,
+    firstName: firstName, // From registration input
+    lastName: lastName,   // From registration input
+    email: email.toLowerCase(), // From registration input
+    // The 'password' field from generateMockUser is not included here,
+    // as it should never be stored in Firestore.
     role: "user", // New sign-ups are always 'user'.
+
+    // Initialize nested objects with their own empty/default values
+    address: {
+      street: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      country: "",
+    },
+    preferences: {
+      language: "EN", // Default language, can be changed by user later
+      newsletter: false,
+      notifications: false,
+      preferredGenres: [], // Empty array for user to populate
+      readingLevel: "Beginner", // Default level
+    },
+    stats: {
+      totalBooksRead: 0,
+      totalPagesRead: 0,
+      averageRatingGiven: 0.0,
+      booksInWishlist: 0,
+      loyaltyPoints: 0,
+      lastActivityDate: null, // No activity yet for a new user
+    },
+
+    // Timestamps are set by the server
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+
+    // New users generally have unverified emails initially
+    emailVerified: false,
   };
+  // 3. Populate the user document with real data.
+  // const userData = {
+  //   ...newUserTemplate,
+  //   email: email.toLowerCase(),
+  //   firstName,
+  //   lastName,
+  //   role: "user", // New sign-ups are always 'user'.
+  //   createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  //   updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  // };
 
   // 4. Create the user document in Firestore with the UID from Auth as the doc ID.
   await db.collection("users").doc(userRecord.uid).set(userData);
