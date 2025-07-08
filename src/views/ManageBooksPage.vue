@@ -62,7 +62,7 @@
     </div>
 
     <BookModal v-if="showModal" :book="selectedBook" :mode="modalMode" @close="closeModal" @save="saveBook" />
-    <div v-if="showDeleteModal" class="modal-overlay" @click.self="closeModal">
+    <div v-if="showDeleteModal" class="delete-modal" @click.self="closeModal">
       <div class="delete-modal-content">
         <h3>Confirm Delete</h3>
         <p>Are you sure you want to delete "{{ selectedBook?.title }}"?</p>
