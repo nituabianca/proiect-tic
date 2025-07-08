@@ -20,8 +20,8 @@
           <div v-for="item in items" :key="item.id" class="cart-item-card">
             <div class="item-main-info">
               <img
-                :src="`https://picsum.photos/seed/${book.id}/150/200`"
-                :alt="book.title"
+                :src="`https://picsum.photos/seed/${item.id}/150/200`"
+                :alt="item.title"
                 class="book-cover-small"
               />
               <div class="item-details">
